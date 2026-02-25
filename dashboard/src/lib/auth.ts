@@ -6,15 +6,17 @@ import { Pool } from 'pg';
 import bcrypt from 'bcryptjs';
 
 // ─────────────────────────────────────────────
-// Production environment validation
+// Production environment validation (deferred to request time)
 // ─────────────────────────────────────────────
 
-if (process.env.NODE_ENV === 'production') {
-  if (!process.env.ADMIN_PASSWORD) {
-    throw new Error('ADMIN_PASSWORD environment variable is required in production');
-  }
-  if (process.env.ADMIN_PASSWORD.length < 12) {
-    throw new Error('ADMIN_PASSWORD must be at least 12 characters in production');
+function validateProductionEnv(): void {
+  if (process.env.NODE_ENV === 'production') {
+    if (!process.env.ADMIN_PASSWORD) {
+      throw new Error('ADMIN_PASSWORD environment variable is required in production');
+    }
+    if (process.env.ADMIN_PASSWORD.length < 12) {
+      throw new Error('ADMIN_PASSWORD must be at least 12 characters in production');
+    }
   }
 }
 
@@ -116,6 +118,7 @@ const providers: NextAuthOptions['providers'] = [
       // NextAuth passes request headers via the `req` object; we capture IP below
     },
     async authorize(credentials, req) {
+      validateProductionEnv();
       if (!credentials?.email || !credentials?.password) return null;
 
       const ip: string =
