@@ -4,6 +4,7 @@ import {
   Bell, CheckCheck, Trash2, AlertTriangle, Info, Zap,
   AlertCircle, RefreshCw, X,
 } from 'lucide-react';
+import { PageIntro } from '@/components/guidance';
 import {
   useNotifications,
   markNotificationRead,
@@ -99,6 +100,15 @@ export default function NotificationsPage() {
 
   return (
     <div className="p-6 max-w-3xl">
+      <PageIntro
+        page="notifications"
+        icon={<Bell size={16} className="text-blue-400" />}
+        title="Notifications — Platform Alerts That Need Your Attention"
+        auto="The platform sends alerts when: an agent fails, an experiment finds a winner, AI budget thresholds are hit, or lead milestones are reached"
+        yourJob="Review critical (red) alerts. Experiment winner alerts are the most valuable — scale those immediately"
+        outcome="Stay informed without watching dashboards all day — only see what actually requires action"
+      />
+
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div>

@@ -73,10 +73,8 @@ module.exports = {
     {
       name: 'lsc-analytics',
       cwd: '/var/www/html/lsc_marketing_automation/api',
-      script: 'uvicorn main:app --host 127.0.0.1 --port 8000 --workers 2',
+      script: '/var/www/html/lsc_marketing_automation/scripts/start-analytics.sh',
       interpreter: 'bash',
-      interpreter_args: '-c',
-      env_file: '/var/www/html/lsc_marketing_automation/.env',
       env: {
         NODE_ENV: 'production',
       },

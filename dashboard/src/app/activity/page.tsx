@@ -2,6 +2,7 @@
 import { useState } from 'react';
 import { useSSE, ActivityEvent } from '@/hooks/useSSE';
 import { Radio, Zap, User, TrendingUp, BookOpen, AlertCircle, X, type LucideIcon } from 'lucide-react';
+import { PageIntro } from '@/components/guidance';
 
 // ─── Event type config ────────────────────────────────────────────────────────
 
@@ -148,6 +149,14 @@ export default function ActivityPage() {
 
   return (
     <div className="p-6 max-w-3xl mx-auto">
+      <PageIntro
+        page="activity"
+        icon={<Radio size={16} className="text-green-400" />}
+        title="Live Activity — Real-Time Revenue Events"
+        auto="Every lead score, stage change, and content publish streams here in real time via server-sent events"
+        yourJob="Watch for intent spikes (red) — those are hot leads to act on immediately"
+        outcome="After 30 days: a pattern of which events precede revenue, informing agent priorities"
+      />
 
       {/* Header */}
       <div className="flex items-start justify-between mb-6">

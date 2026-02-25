@@ -202,6 +202,7 @@ export default function ContentPage() {
   const [deletingAll,        setDeletingAll]        = useState(false);
   const [repurposing,        setRepurposing]        = useState<string | null>(null);
   const [approving,          setApproving]          = useState<string | null>(null);
+  const [bulkPublishing,     setBulkPublishing]     = useState(false);
 
   const list = (items ?? []).filter(i => filter === 'all' || i.content_type === filter);
   const pendingApproval = (items ?? []).filter(i => i.approval_status === 'pending_review');
@@ -241,6 +242,16 @@ export default function ContentPage() {
     } finally {
       setRepurposing(null);
       refresh();
+    }
+  }
+
+  async function bulkPublish() {
+    setBulkPublishing(true);
+    try {
+      await fetch(`${API_BASE}/api/content/bulk-publish`, { method: 'POST' });
+      refresh();
+    } finally {
+      setBulkPublishing(false);
     }
   }
 
@@ -359,6 +370,18 @@ export default function ContentPage() {
               No items pending review
             </div>
           ) : (
+            <>
+              <div className="flex items-center justify-between px-4 py-3 border-b border-gray-800">
+                <span className="text-xs text-gray-400">{pendingApproval.length} item{pendingApproval.length !== 1 ? 's' : ''} pending review</span>
+                <button
+                  onClick={bulkPublish}
+                  disabled={bulkPublishing}
+                  className="flex items-center gap-1.5 px-4 py-1.5 rounded-lg bg-green-600 hover:bg-green-500 text-white text-xs font-medium transition-colors disabled:opacity-50"
+                >
+                  {bulkPublishing ? <RefreshCw size={12} className="animate-spin" /> : <CheckCircle size={12} />}
+                  Publish All
+                </button>
+              </div>
             <div className="divide-y divide-gray-800/60">
               {pendingApproval.map(item => (
                 <div key={item.id} className="flex items-center gap-4 px-4 py-3">
@@ -395,6 +418,7 @@ export default function ContentPage() {
                 </div>
               ))}
             </div>
+            </>
           )}
         </div>
       )}

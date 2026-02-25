@@ -1,6 +1,6 @@
 'use client';
 import { useState } from 'react';
-import { Settings, Bell, Users, CheckCircle, XCircle, Eye, EyeOff, Zap } from 'lucide-react';
+import { Settings, Bell, Users, CheckCircle, XCircle, Eye, EyeOff, Zap, Copy, Check, Link } from 'lucide-react';
 import UsersPage from './users/page';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4001';
@@ -86,6 +86,61 @@ function IntegrationCard({ name, label, icon, description }: any) {
   );
 }
 
+function WebhookCard() {
+  const [copied, setCopied] = useState<string | null>(null);
+  const baseUrl = typeof window !== 'undefined' ? window.location.origin.replace(':4002', '') : 'https://marketing.linkswitchcommunications.com';
+  const webhookUrl = `${baseUrl}/webhook/lead`;
+  const revenueUrl = `${baseUrl}/webhook/revenue`;
+
+  function copy(text: string, key: string) {
+    navigator.clipboard.writeText(text).then(() => {
+      setCopied(key);
+      setTimeout(() => setCopied(null), 2000);
+    });
+  }
+
+  return (
+    <div className="bg-blue-950/30 border border-blue-800/50 rounded-xl p-5">
+      <div className="flex items-center gap-2 mb-1">
+        <Link size={15} className="text-blue-400" />
+        <h3 className="text-sm font-semibold text-white">Lead Capture Webhook URLs</h3>
+      </div>
+      <p className="text-xs text-gray-400 mb-4">
+        Send leads from any source (website forms, ads, partner portals) to these endpoints.
+        Each lead is scored 0–100 in under 2 seconds and routed into your pipeline automatically.
+      </p>
+      <div className="space-y-3">
+        {[
+          { label: 'New Lead', method: 'POST', url: webhookUrl, key: 'lead', desc: 'Capture leads from website forms, landing pages, or any external source' },
+          { label: 'Revenue Event', method: 'POST', url: revenueUrl, key: 'rev', desc: 'Record a sale or conversion — triggers attribution analysis automatically' },
+        ].map(item => (
+          <div key={item.key} className="bg-gray-900/60 border border-gray-800 rounded-lg p-3">
+            <div className="flex items-center justify-between mb-1.5">
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-blue-600 text-white">{item.method}</span>
+                <span className="text-xs font-medium text-gray-300">{item.label}</span>
+              </div>
+              <button
+                onClick={() => copy(item.url, item.key)}
+                className="flex items-center gap-1 px-2 py-1 rounded-lg bg-gray-800 hover:bg-gray-700 text-xs text-gray-400 hover:text-white transition-colors"
+              >
+                {copied === item.key ? <Check size={11} className="text-green-400" /> : <Copy size={11} />}
+                {copied === item.key ? 'Copied!' : 'Copy'}
+              </button>
+            </div>
+            <code className="block text-xs font-mono text-blue-300 bg-gray-950 rounded px-2 py-1.5 break-all">{item.url}</code>
+            <p className="text-[11px] text-gray-500 mt-1.5">{item.desc}</p>
+          </div>
+        ))}
+      </div>
+      <div className="mt-3 text-[11px] text-gray-500 bg-gray-900/40 rounded-lg px-3 py-2">
+        <span className="text-yellow-400 font-medium">Example lead payload:</span>{' '}
+        <code className="font-mono text-gray-400">{'{ "email": "name@company.com", "company": "Acme", "source": "website" }'}</code>
+      </div>
+    </div>
+  );
+}
+
 const TABS = ['Integrations', 'Alerts', 'Users'] as const;
 type Tab = typeof TABS[number];
 
@@ -121,8 +176,11 @@ export default function SettingsPage() {
       </div>
 
       {tab === 'Integrations' && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-3xl">
-          {INTEGRATIONS.map(i => <IntegrationCard key={i.name} {...i} />)}
+        <div className="space-y-6 max-w-3xl">
+          <WebhookCard />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {INTEGRATIONS.map(i => <IntegrationCard key={i.name} {...i} />)}
+          </div>
         </div>
       )}
 

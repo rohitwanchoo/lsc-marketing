@@ -4,6 +4,7 @@ import {
   Activity, Clock, CheckCircle, XCircle, Loader2,
   RefreshCw, Zap, ChevronDown, ChevronUp,
 } from 'lucide-react';
+import { PageIntro } from '@/components/guidance';
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? '';
 
@@ -137,6 +138,15 @@ export default function JobsPage() {
 
   return (
     <div className="p-6 space-y-6">
+      <PageIntro
+        page="jobs"
+        icon={<Activity size={16} className="text-blue-400" />}
+        title="Job Queue — What the Platform Is Doing Right Now"
+        auto="All 7 agents dispatch jobs here automatically on their schedules. Each job is logged with duration, tokens, and cost"
+        yourJob="Normally just watch. If you see repeated failures, check the Agents page to retrigger or investigate"
+        outcome="Over time: clear visibility into agent costs so you know the exact ROI of AI automation"
+      />
+
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>

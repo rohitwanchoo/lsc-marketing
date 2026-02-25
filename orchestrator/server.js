@@ -1263,6 +1263,18 @@ app.patch('/api/content/:id/approval', async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+app.post('/api/content/bulk-publish', async (req, res) => {
+  try {
+    const result = await query(
+      `UPDATE content_assets
+       SET status = 'published', approval_status = 'approved', published_at = COALESCE(published_at, NOW())
+       WHERE status IN ('review', 'draft') OR approval_status = 'pending_review'
+       RETURNING id`
+    );
+    res.json({ ok: true, published: result.rows.length });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 app.post('/api/content/:id/repurpose', async (req, res) => {
   try {
     const { platforms = ['linkedin', 'twitter'] } = req.body;
