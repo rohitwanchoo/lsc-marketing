@@ -1,0 +1,10 @@
+FROM node:20-alpine
+RUN apk add --no-cache dumb-init
+WORKDIR /app
+COPY package.json ./
+RUN npm install --production
+COPY . .
+RUN mkdir -p /var/log/lsc
+EXPOSE 3001
+ENTRYPOINT ["dumb-init", "--"]
+CMD ["node", "server.js"]

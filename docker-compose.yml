@@ -1,0 +1,142 @@
+version: '3.9'
+
+services:
+
+  # ─────────────────────────────────────────────
+  # PostgreSQL — Primary database
+  # ─────────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    container_name: lsc_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB:       ${DB_NAME:-lsc_marketing}
+      POSTGRES_USER:     ${DB_USER:-lsc_user}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-lsc_password}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./database/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql
+      - ./database/seeds:/docker-entrypoint-initdb.d/seeds
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-lsc_user}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ─────────────────────────────────────────────
+  # Redis — Job queues + caching
+  # ─────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: lsc_redis
+    restart: unless-stopped
+    command: redis-server --maxmemory 256mb --maxmemory-policy allkeys-lru
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  # ─────────────────────────────────────────────
+  # Orchestrator — Node.js Brain + Cron Scheduler
+  # ─────────────────────────────────────────────
+  orchestrator:
+    build:
+      context: ./orchestrator
+      dockerfile: ../docker/Dockerfile.orchestrator
+    container_name: lsc_orchestrator
+    restart: unless-stopped
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis:    { condition: service_healthy }
+    env_file: .env
+    ports:
+      - "3001:3001"
+    volumes:
+      - ./orchestrator:/app
+      - /var/log/lsc:/var/log/lsc
+    command: node server.js
+
+  # ─────────────────────────────────────────────
+  # Workers — BullMQ Job Processors
+  # ─────────────────────────────────────────────
+  workers:
+    build:
+      context: ./orchestrator
+      dockerfile: ../docker/Dockerfile.orchestrator
+    container_name: lsc_workers
+    restart: unless-stopped
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis:    { condition: service_healthy }
+    env_file: .env
+    volumes:
+      - ./orchestrator:/app
+      - /var/log/lsc:/var/log/lsc
+    command: node queues/worker-runner.js
+    deploy:
+      resources:
+        limits:
+          memory: 1g
+
+  # ─────────────────────────────────────────────
+  # Dashboard — Next.js
+  # ─────────────────────────────────────────────
+  dashboard:
+    build:
+      context: ./dashboard
+      dockerfile: ../docker/Dockerfile.dashboard
+    container_name: lsc_dashboard
+    restart: unless-stopped
+    depends_on:
+      - orchestrator
+    environment:
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:3001}
+    ports:
+      - "3000:3000"
+
+  # ─────────────────────────────────────────────
+  # ─────────────────────────────────────────────
+  # Python Analytics API
+  # ─────────────────────────────────────────────
+  analytics-api:
+    build:
+      context: ./api
+      dockerfile: ../docker/Dockerfile.api
+    container_name: lsc_analytics_api
+    restart: unless-stopped
+    depends_on:
+      postgres: { condition: service_healthy }
+    env_file: .env
+    ports:
+      - "8000:8000"
+    environment:
+      ANALYTICS_PORT: 8000
+
+  # BullMQ Board — Queue monitoring UI
+  # ─────────────────────────────────────────────
+  bull-board:
+    image: deadly0/bull-board:latest
+    container_name: lsc_bull_board
+    restart: unless-stopped
+    ports:
+      - "3002:3000"
+    environment:
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+    depends_on:
+      - redis
+
+volumes:
+  postgres_data:
+  redis_data:
+
+networks:
+  default:
+    name: lsc_network

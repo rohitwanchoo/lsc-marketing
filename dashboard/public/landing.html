@@ -1,0 +1,1481 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LSC Platform — Autonomous Organic Revenue. No Ads Required.</title>
+  <meta name="description" content="7 AI agents working 24/7 to discover keywords, generate content, nurture leads and grow organic revenue — fully autonomous.">
+
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Figtree:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+
+  <!-- Bootstrap 5 -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+
+  <!-- FontAwesome -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+
+  <!-- AOS -->
+  <link href="https://unpkg.com/aos@2.3.4/dist/aos.css" rel="stylesheet">
+
+  <style>
+    /* ── CSS Variables (mirroring SEOC index4 palette) ─────────── */
+    :root {
+      --font: 'Figtree', sans-serif;
+      --accent:      #ADFF1C;   /* lime-green — primary CTA */
+      --dark-bg:     #104041;   /* dark teal — hero / testimonials / CTA */
+      --dark-bg2:    #0A2828;
+      --text-dark:   #090B0E;
+      --text-body:   #3D4C5E;
+      --text-light:  #F6F8F9;
+      --bg-light:    #F6F8F9;
+      --card-1:      #FFE8A4;   /* yellow */
+      --card-2:      #CAC6FD;   /* lavender */
+      --card-3:      #D4FFD6;   /* mint */
+      --card-4:      #FEBFDA;   /* pink */
+      --card-5:      #FFD6B0;   /* peach */
+      --card-6:      #B0E8FF;   /* sky */
+      --card-7:      #E8D4FF;   /* purple-light */
+      --border:      #E5E7EB;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      font-family: var(--font);
+      font-size: 16px;
+      font-weight: 400;
+      color: var(--text-body);
+      background: #fff;
+      overflow-x: hidden;
+    }
+
+    h1,h2,h3,h4,h5,h6 { font-family: var(--font); color: var(--text-dark); font-weight: 700; }
+    p { line-height: 1.7; margin-bottom: 0; }
+    a { text-decoration: none; transition: all .3s; }
+    img { max-width: 100%; }
+
+    .sp1 { padding: 100px 0; }
+    .sp2 { padding: 80px 0; }
+
+    /* ── Badge pills ─────────────────────────────────────────── */
+    .section-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(173,255,28,.12);
+      border: 1px solid rgba(173,255,28,.3);
+      color: var(--dark-bg);
+      font-size: 13px;
+      font-weight: 600;
+      padding: 6px 16px;
+      border-radius: 100px;
+      margin-bottom: 16px;
+    }
+    .section-badge .dot {
+      width: 8px; height: 8px;
+      background: var(--accent);
+      border-radius: 50%;
+    }
+    .section-badge-light {
+      background: rgba(173,255,28,.15);
+      border-color: rgba(173,255,28,.4);
+      color: var(--accent);
+    }
+
+    /* ── Buttons ─────────────────────────────────────────────── */
+    .btn-primary-lsc {
+      display: inline-flex; align-items: center; gap: 10px;
+      background: var(--accent);
+      color: var(--text-dark);
+      font-size: 16px; font-weight: 700;
+      padding: 14px 28px;
+      border-radius: 6px;
+      border: 2px solid var(--accent);
+      transition: all .35s;
+    }
+    .btn-primary-lsc:hover {
+      background: var(--dark-bg);
+      border-color: var(--dark-bg);
+      color: var(--accent);
+    }
+    .btn-outline-lsc {
+      display: inline-flex; align-items: center; gap: 10px;
+      background: transparent;
+      color: var(--accent);
+      font-size: 16px; font-weight: 700;
+      padding: 14px 28px;
+      border-radius: 6px;
+      border: 2px solid var(--accent);
+      transition: all .35s;
+    }
+    .btn-outline-lsc:hover {
+      background: var(--accent);
+      color: var(--text-dark);
+    }
+
+    /* ── NAV ─────────────────────────────────────────────────── */
+    .lsc-nav {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 1000;
+      background: rgba(16,64,65,.95);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid rgba(173,255,28,.15);
+      padding: 0;
+      transition: all .3s;
+    }
+    .lsc-nav .nav-inner {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 18px 0;
+    }
+    .lsc-nav .nav-logo {
+      display: flex; align-items: center; gap: 10px;
+    }
+    .lsc-nav .nav-logo .logo-icon {
+      width: 36px; height: 36px;
+      background: var(--accent);
+      border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 18px; color: var(--text-dark); font-weight: 800;
+    }
+    .lsc-nav .nav-logo .logo-text {
+      font-size: 20px; font-weight: 800; color: #fff;
+      line-height: 1.1;
+    }
+    .lsc-nav .nav-logo .logo-sub {
+      font-size: 8px; font-weight: 600; color: var(--accent);
+      letter-spacing: 1px; text-transform: uppercase; white-space: nowrap;
+    }
+    .lsc-nav .nav-links {
+      display: flex; align-items: center; gap: 36px;
+      list-style: none; margin: 0; padding: 0;
+    }
+    .lsc-nav .nav-links a {
+      color: rgba(255,255,255,.8); font-size: 15px; font-weight: 500;
+    }
+    .lsc-nav .nav-links a:hover { color: var(--accent); }
+
+    /* ── HERO ─────────────────────────────────────────────────── */
+    .hero-section {
+      min-height: 100vh;
+      background: var(--dark-bg);
+      background-image:
+        radial-gradient(ellipse 80% 60% at 70% 50%, rgba(173,255,28,.07) 0%, transparent 70%),
+        radial-gradient(ellipse 50% 40% at 10% 80%, rgba(173,255,28,.05) 0%, transparent 60%);
+      display: flex; align-items: center;
+      padding: 120px 0 80px;
+      position: relative;
+      overflow: hidden;
+    }
+    .hero-section::before {
+      content: '';
+      position: absolute; inset: 0;
+      background: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ADFF1C' fill-opacity='0.03'%3E%3Ccircle cx='30' cy='30' r='2'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+    }
+    .hero-badge {
+      display: inline-flex; align-items: center; gap: 8px;
+      background: rgba(173,255,28,.12);
+      border: 1px solid rgba(173,255,28,.3);
+      color: var(--accent);
+      font-size: 13px; font-weight: 600;
+      padding: 7px 16px; border-radius: 100px;
+      margin-bottom: 24px;
+    }
+    .hero-badge i { font-size: 11px; }
+    .hero-section h1 {
+      font-size: clamp(38px, 5vw, 62px);
+      font-weight: 800;
+      color: #fff;
+      line-height: 1.15;
+      margin-bottom: 20px;
+    }
+    .hero-section h1 .accent { color: var(--accent); }
+    .hero-section p {
+      font-size: 18px; color: rgba(255,255,255,.7);
+      max-width: 500px; margin-bottom: 36px; line-height: 1.7;
+    }
+    .hero-btns { display: flex; gap: 16px; flex-wrap: wrap; }
+
+    /* Hero visual panel */
+    .hero-visual {
+      background: rgba(255,255,255,.04);
+      border: 1px solid rgba(173,255,28,.15);
+      border-radius: 20px;
+      padding: 24px;
+      position: relative;
+    }
+    .hero-visual .v-header {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 20px;
+    }
+    .hero-visual .v-title {
+      font-size: 12px; font-weight: 600; color: rgba(255,255,255,.5);
+      text-transform: uppercase; letter-spacing: 1px;
+    }
+    .hero-visual .v-live {
+      display: flex; align-items: center; gap: 6px;
+      font-size: 11px; font-weight: 600; color: var(--accent);
+    }
+    .hero-visual .v-live span {
+      width: 7px; height: 7px; border-radius: 50%; background: var(--accent);
+      animation: pulse 1.5s infinite;
+    }
+    @keyframes pulse {
+      0%,100% { opacity: 1; transform: scale(1); }
+      50% { opacity: .5; transform: scale(1.3); }
+    }
+    .agent-row {
+      display: flex; align-items: center; gap: 12px;
+      background: rgba(255,255,255,.04);
+      border: 1px solid rgba(255,255,255,.07);
+      border-radius: 10px; padding: 12px 14px; margin-bottom: 8px;
+      transition: border-color .3s;
+    }
+    .agent-row:hover { border-color: rgba(173,255,28,.3); }
+    .agent-row .a-icon {
+      width: 34px; height: 34px; border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 15px; flex-shrink: 0;
+    }
+    .agent-row .a-info { flex: 1; }
+    .agent-row .a-name {
+      font-size: 12px; font-weight: 600; color: #fff; line-height: 1.2;
+    }
+    .agent-row .a-status {
+      font-size: 10px; color: rgba(255,255,255,.4);
+    }
+    .agent-row .a-badge {
+      font-size: 10px; font-weight: 600; padding: 3px 8px;
+      border-radius: 4px; white-space: nowrap;
+    }
+    .badge-running { background: rgba(173,255,28,.15); color: var(--accent); }
+    .badge-idle    { background: rgba(255,255,255,.07); color: rgba(255,255,255,.4); }
+    .badge-success { background: rgba(34,197,94,.15); color: #4ade80; }
+
+    /* Cost ticker */
+    .cost-ticker {
+      background: rgba(173,255,28,.08);
+      border: 1px solid rgba(173,255,28,.2);
+      border-radius: 12px; padding: 14px 16px;
+      display: flex; align-items: center; justify-content: space-between;
+      margin-top: 12px;
+    }
+    .cost-ticker .c-label {
+      font-size: 11px; color: rgba(255,255,255,.5); font-weight: 500;
+    }
+    .cost-ticker .c-value {
+      font-size: 20px; font-weight: 800; color: var(--accent);
+    }
+
+    /* ── STATS BAR ────────────────────────────────────────────── */
+    .stats-bar {
+      background: var(--dark-bg2);
+      padding: 36px 0;
+      border-top: 1px solid rgba(173,255,28,.1);
+      border-bottom: 1px solid rgba(173,255,28,.1);
+    }
+    .stat-item { text-align: center; }
+    .stat-item .s-num {
+      font-size: 42px; font-weight: 800;
+      color: var(--accent); line-height: 1;
+      margin-bottom: 6px;
+    }
+    .stat-item .s-label {
+      font-size: 14px; color: rgba(255,255,255,.6); font-weight: 500;
+    }
+    .stat-divider {
+      width: 1px; background: rgba(255,255,255,.1);
+      align-self: stretch; margin: 8px 0;
+    }
+
+    /* ── HOW IT WORKS ─────────────────────────────────────────── */
+    .hiw-section { background: var(--bg-light); }
+    .hiw-step {
+      display: flex; gap: 24px; align-items: flex-start;
+      padding: 28px 0;
+      border-bottom: 1px solid var(--border);
+      position: relative;
+    }
+    .hiw-step:last-child { border-bottom: none; }
+    .hiw-step:hover .step-arrow { transform: translateX(4px); }
+    .step-num {
+      font-size: 48px; font-weight: 800; color: rgba(16,64,65,.12);
+      line-height: 1; min-width: 70px; flex-shrink: 0; text-align: right;
+    }
+    .step-content { flex: 1; padding-top: 4px; }
+    .step-content h4 {
+      font-size: 20px; font-weight: 700; color: var(--text-dark);
+      margin-bottom: 8px;
+    }
+    .step-content p { font-size: 15px; color: var(--text-body); }
+    .step-arrow {
+      display: flex; align-items: center; justify-content: center;
+      width: 44px; height: 44px; border-radius: 50%;
+      background: var(--dark-bg); color: var(--accent);
+      flex-shrink: 0; transition: transform .3s;
+      margin-top: 4px;
+    }
+
+    /* ── AGENTS (SERVICES) ────────────────────────────────────── */
+    .agents-section {}
+    .agent-card {
+      border-radius: 20px; padding: 36px 28px;
+      height: 100%;
+      transition: transform .3s, box-shadow .3s;
+      position: relative; overflow: hidden;
+    }
+    .agent-card:hover { transform: translateY(-6px); box-shadow: 0 20px 60px rgba(0,0,0,.1); }
+    .agent-card .card-num {
+      font-size: 42px; font-weight: 800; color: rgba(0,0,0,.25); line-height: 1;
+      margin-bottom: 20px;
+    }
+    .agent-card .card-icon {
+      width: 56px; height: 56px; border-radius: 14px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 24px; margin-bottom: 20px;
+      background: rgba(255,255,255,.5);
+    }
+    .agent-card h4 {
+      font-size: 20px; font-weight: 700; margin-bottom: 10px;
+    }
+    .agent-card p { font-size: 14px; color: var(--text-body); line-height: 1.65; }
+    .agent-card .card-tags {
+      display: flex; flex-wrap: wrap; gap: 6px; margin-top: 16px;
+    }
+    .card-tag {
+      font-size: 11px; font-weight: 600; padding: 4px 10px; border-radius: 4px;
+      background: rgba(0,0,0,.07); color: var(--text-body);
+    }
+
+    /* ── LOOP STEPS ───────────────────────────────────────────── */
+    .loop-section { background: var(--dark-bg); padding: 100px 0; }
+    .loop-step {
+      text-align: center; padding: 20px;
+    }
+    .loop-step .ls-icon {
+      width: 64px; height: 64px; border-radius: 50%;
+      background: rgba(173,255,28,.12);
+      border: 1px solid rgba(173,255,28,.25);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 24px; color: var(--accent);
+      margin: 0 auto 16px;
+    }
+    .loop-step h5 {
+      font-size: 16px; font-weight: 700; color: #fff; margin-bottom: 8px;
+    }
+    .loop-step p { font-size: 13px; color: rgba(255,255,255,.55); }
+    .loop-arrow {
+      display: flex; align-items: center; justify-content: center;
+      color: rgba(173,255,28,.4); font-size: 20px; padding-top: 26px;
+    }
+
+    /* ── TRANSPARENCY (Case study style) ─────────────────────── */
+    .transparency-section {}
+    .metric-row {
+      display: flex; align-items: center; gap: 24px;
+      padding: 24px 0;
+      border-bottom: 1px solid var(--border);
+      transition: background .2s;
+      cursor: default;
+    }
+    .metric-row:hover { background: var(--bg-light); margin: 0 -24px; padding: 24px; border-radius: 8px; }
+    .metric-row:last-child { border-bottom: none; }
+    .metric-num {
+      font-size: 14px; font-weight: 700; color: rgba(16,64,65,.25);
+      min-width: 32px; text-align: right;
+    }
+    .metric-content { flex: 1; }
+    .metric-content h5 {
+      font-size: 18px; font-weight: 700; color: var(--text-dark); margin-bottom: 4px;
+    }
+    .metric-content p { font-size: 14px; color: var(--text-body); }
+    .metric-value {
+      font-size: 22px; font-weight: 800; color: var(--dark-bg);
+      min-width: 80px; text-align: right;
+    }
+
+    /* ── PRICING ──────────────────────────────────────────────── */
+    .pricing-section { background: var(--bg-light); }
+    .price-card {
+      background: #fff; border: 2px solid var(--border);
+      border-radius: 20px; padding: 40px 32px;
+      height: 100%; transition: all .3s;
+    }
+    .price-card:hover { border-color: var(--dark-bg); box-shadow: 0 16px 48px rgba(16,64,65,.1); }
+    .price-card.featured {
+      background: var(--dark-bg);
+      border-color: var(--accent);
+    }
+    .price-card .plan-name {
+      font-size: 13px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase;
+      color: var(--text-body); margin-bottom: 16px;
+    }
+    .price-card.featured .plan-name { color: rgba(255,255,255,.6); }
+    .price-card .price-num {
+      font-size: 48px; font-weight: 800; color: var(--text-dark); line-height: 1;
+    }
+    .price-card.featured .price-num { color: var(--accent); }
+    .price-card .price-sub { font-size: 14px; color: var(--text-body); margin-bottom: 28px; }
+    .price-card.featured .price-sub { color: rgba(255,255,255,.5); }
+    .price-feature {
+      display: flex; align-items: flex-start; gap: 10px;
+      font-size: 14px; color: var(--text-body); margin-bottom: 12px;
+    }
+    .price-card.featured .price-feature { color: rgba(255,255,255,.7); }
+    .price-feature i { color: var(--dark-bg); margin-top: 2px; flex-shrink: 0; }
+    .price-card.featured .price-feature i { color: var(--accent); }
+    .price-divider { border-color: var(--border); margin: 24px 0; }
+    .price-card.featured .price-divider { border-color: rgba(255,255,255,.1); }
+
+    /* ── CTA SECTION ──────────────────────────────────────────── */
+    .cta-section {
+      background: var(--dark-bg);
+      background-image: radial-gradient(ellipse 70% 50% at 50% 100%, rgba(173,255,28,.08) 0%, transparent 70%);
+      padding: 100px 0; text-align: center;
+    }
+    .cta-section h2 {
+      font-size: clamp(32px, 4vw, 52px); font-weight: 800; color: #fff;
+      max-width: 680px; margin: 0 auto 20px; line-height: 1.2;
+    }
+    .cta-section p {
+      font-size: 17px; color: rgba(255,255,255,.65);
+      max-width: 480px; margin: 0 auto 40px;
+    }
+    .cta-btns { display: flex; gap: 16px; justify-content: center; flex-wrap: wrap; }
+
+    /* ── TESTIMONIALS ─────────────────────────────────────────── */
+    .testimonials-section { background: #fff; }
+    .testi-card {
+      background: var(--bg-light); border-radius: 16px;
+      padding: 32px; border: 1px solid var(--border);
+      height: 100%; transition: all .3s;
+    }
+    .testi-card:hover { border-color: var(--dark-bg); background: #fff; }
+    .testi-stars { color: var(--accent); font-size: 14px; margin-bottom: 16px; }
+    .testi-text { font-size: 15px; color: var(--text-body); line-height: 1.7; margin-bottom: 20px; }
+    .testi-author { display: flex; align-items: center; gap: 12px; }
+    .testi-avatar {
+      width: 44px; height: 44px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 16px; font-weight: 700; color: var(--text-dark);
+      flex-shrink: 0;
+    }
+    .testi-author .author-name { font-size: 14px; font-weight: 700; color: var(--text-dark); }
+    .testi-author .author-role { font-size: 12px; color: var(--text-body); }
+
+    /* ── FAQ ──────────────────────────────────────────────────── */
+    .faq-section { background: var(--bg-light); }
+    .faq-item {
+      background: #fff; border-radius: 12px; margin-bottom: 12px;
+      border: 1px solid var(--border); overflow: hidden;
+    }
+    .faq-question {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 20px 24px; cursor: pointer;
+      font-size: 16px; font-weight: 600; color: var(--text-dark);
+      transition: color .2s;
+    }
+    .faq-question:hover { color: var(--dark-bg); }
+    .faq-question .faq-icon {
+      width: 32px; height: 32px; border-radius: 50%;
+      background: var(--bg-light);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 13px; color: var(--text-body); flex-shrink: 0;
+      transition: all .3s;
+    }
+    .faq-answer {
+      display: none; padding: 0 24px 20px;
+      font-size: 15px; color: var(--text-body); line-height: 1.7;
+    }
+    .faq-item.open .faq-answer { display: block; }
+    .faq-item.open .faq-icon { background: var(--dark-bg); color: var(--accent); transform: rotate(45deg); }
+    .faq-item.open .faq-question { color: var(--dark-bg); }
+
+    /* ── FOOTER ───────────────────────────────────────────────── */
+    .lsc-footer {
+      background: var(--dark-bg2);
+      padding: 80px 0 0;
+    }
+    .footer-logo-wrap { margin-bottom: 20px; }
+    .footer-logo-icon {
+      width: 40px; height: 40px; background: var(--accent); border-radius: 10px;
+      display: inline-flex; align-items: center; justify-content: center;
+      font-size: 20px; font-weight: 800; color: var(--text-dark);
+      margin-bottom: 12px;
+    }
+    .footer-brand { font-size: 22px; font-weight: 800; color: #fff; }
+    .footer-tagline { font-size: 13px; color: rgba(255,255,255,.5); margin-top: 12px; line-height: 1.6; max-width: 260px; }
+    .footer-h { font-size: 15px; font-weight: 700; color: #fff; margin-bottom: 20px; }
+    .footer-links { list-style: none; padding: 0; margin: 0; }
+    .footer-links li { margin-bottom: 10px; }
+    .footer-links a { font-size: 14px; color: rgba(255,255,255,.55); transition: color .2s; }
+    .footer-links a:hover { color: var(--accent); }
+    .footer-contact-item {
+      display: flex; gap: 12px; align-items: flex-start; margin-bottom: 14px;
+    }
+    .footer-contact-item .fci-icon {
+      width: 32px; height: 32px; background: rgba(173,255,28,.1);
+      border-radius: 8px; display: flex; align-items: center; justify-content: center;
+      color: var(--accent); font-size: 13px; flex-shrink: 0; margin-top: 2px;
+    }
+    .footer-contact-item p { font-size: 13px; color: rgba(255,255,255,.5); margin: 0; }
+    .footer-newsletter-input {
+      display: flex; gap: 0; margin-top: 4px;
+    }
+    .footer-newsletter-input input {
+      flex: 1; background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.12);
+      color: #fff; padding: 12px 16px; font-size: 14px; border-radius: 8px 0 0 8px;
+      outline: none; font-family: var(--font);
+    }
+    .footer-newsletter-input input::placeholder { color: rgba(255,255,255,.3); }
+    .footer-newsletter-input button {
+      background: var(--accent); color: var(--text-dark); border: none;
+      padding: 12px 18px; font-size: 14px; font-weight: 700; cursor: pointer;
+      border-radius: 0 8px 8px 0; font-family: var(--font); transition: all .3s;
+    }
+    .footer-newsletter-input button:hover { background: #fff; }
+    .footer-divider {
+      border-top: 1px solid rgba(255,255,255,.08); margin-top: 60px; padding: 24px 0;
+    }
+    .footer-copy { font-size: 13px; color: rgba(255,255,255,.35); }
+    .footer-policy { list-style: none; padding: 0; margin: 0; display: flex; gap: 24px; }
+    .footer-policy a { font-size: 13px; color: rgba(255,255,255,.35); }
+    .footer-policy a:hover { color: var(--accent); }
+
+    /* ── FLOATING ACTION ──────────────────────────────────────── */
+    .scroll-top-btn {
+      position: fixed; bottom: 30px; right: 30px; z-index: 999;
+      width: 46px; height: 46px; border-radius: 50%;
+      background: var(--accent); color: var(--text-dark);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 16px; cursor: pointer; border: none;
+      box-shadow: 0 4px 20px rgba(173,255,28,.4);
+      opacity: 0; transition: all .3s; pointer-events: none;
+    }
+    .scroll-top-btn.show { opacity: 1; pointer-events: all; }
+    .scroll-top-btn:hover { transform: translateY(-3px); }
+
+    /* ── SECTION TITLES ───────────────────────────────────────── */
+    .section-title { font-size: clamp(28px, 3.5vw, 44px); font-weight: 800; line-height: 1.2; margin-bottom: 16px; }
+    .section-sub { font-size: 17px; color: var(--text-body); line-height: 1.6; max-width: 560px; }
+    .section-sub.center { margin: 0 auto; }
+
+    /* Responsive */
+    @media (max-width: 991px) {
+      .sp1 { padding: 70px 0; }
+      .hero-section { padding: 100px 0 60px; }
+      .hero-visual { margin-top: 40px; }
+      .lsc-nav .nav-links, .lsc-nav .nav-cta { display: none; }
+      .mobile-menu-btn { display: flex !important; }
+      .stat-divider { display: none; }
+    }
+    @media (max-width: 767px) {
+      .hero-section h1 { font-size: 34px; }
+      .section-title { font-size: 28px; }
+      .section-sub { font-size: 15px; }
+      .sp1 { padding: 50px 0; }
+      .hero-section { padding: 90px 0 50px; }
+
+      /* Agent cards — single column */
+      .agent-card { padding: 24px 20px; }
+      .agent-card .card-num { font-size: 32px; }
+
+      /* Pricing — full width */
+      .pricing-card { margin-bottom: 16px; }
+
+      /* Stats bar — wrap and center */
+      .stats-bar .row { gap: 12px 0; }
+      .stats-bar [class*="col-"] { text-align: center; }
+
+      /* Loop steps */
+      .loop-step { padding: 16px; margin-bottom: 12px; }
+
+      /* How it works steps */
+      .step-card { padding: 24px 16px; }
+
+      /* Footer */
+      .footer-logo-wrap { margin-bottom: 16px; }
+      .lsc-footer { padding: 50px 0 24px; }
+      .footer-h { margin-top: 24px; }
+
+      /* Testimonials */
+      .testi-card { padding: 24px 20px; }
+
+      /* FAQ */
+      .faq-question { font-size: 15px; padding: 14px 16px; }
+
+      /* CTA section */
+      .cta-section { padding: 50px 0; }
+      .cta-section h2 { font-size: 26px; }
+
+      /* Hero buttons stack */
+      .hero-section .d-flex.gap-3 { flex-direction: column; align-items: stretch; }
+      .hero-section .d-flex.gap-3 a { text-align: center; justify-content: center; }
+
+      /* Prevent horizontal overflow */
+      body { overflow-x: hidden; }
+      .container { padding-left: 16px; padding-right: 16px; }
+    }
+    @media (max-width: 400px) {
+      .hero-section h1 { font-size: 28px; }
+      .section-title { font-size: 24px; }
+      .btn-primary-lsc, .btn-outline-lsc { padding: 12px 20px; font-size: 14px; }
+    }
+    .mobile-menu-btn {
+      display: none; background: rgba(173,255,28,.1); border: 1px solid rgba(173,255,28,.2);
+      color: var(--accent); width: 40px; height: 40px; border-radius: 8px;
+      align-items: center; justify-content: center; font-size: 18px; cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+
+<!-- ── NAVIGATION ──────────────────────────────────────────────────────────── -->
+<nav class="lsc-nav">
+  <div class="container">
+    <div class="nav-inner">
+      <a href="/" class="nav-logo">
+        <div class="logo-icon">⚡</div>
+        <div>
+          <div class="logo-text">LSC Platform</div>
+          <div class="logo-sub">AI Sales Automation</div>
+        </div>
+      </a>
+      <ul class="nav-links">
+        <li><a href="#features">Agents</a></li>
+        <li><a href="#how-it-works">How It Works</a></li>
+        <li><a href="#loop">The Loop</a></li>
+        <li><a href="#pricing">Pricing</a></li>
+        <li><a href="#faq">FAQ</a></li>
+      </ul>
+      <div class="nav-cta" style="display:flex;align-items:center;gap:10px;">
+        <a href="/overview" style="font-size:14px;font-weight:500;color:rgba(255,255,255,.7);">
+          Login
+        </a>
+        <a href="/overview" class="btn-primary-lsc" style="font-size:14px; padding:10px 22px;">
+          Open Dashboard <i class="fa-solid fa-arrow-right"></i>
+        </a>
+      </div>
+      <button class="mobile-menu-btn" onclick="toggleMobile()">
+        <i class="fa-solid fa-bars" id="mobile-icon"></i>
+      </button>
+    </div>
+    <!-- Mobile dropdown -->
+    <div id="mobile-nav" style="display:none; padding-bottom:16px; border-top:1px solid rgba(255,255,255,.08); margin-top:4px;">
+      <ul style="list-style:none;padding:16px 0 0;margin:0;display:flex;flex-direction:column;gap:12px;">
+        <li><a href="#features" style="color:rgba(255,255,255,.8);font-size:15px;font-weight:500;" onclick="toggleMobile()">Agents</a></li>
+        <li><a href="#how-it-works" style="color:rgba(255,255,255,.8);font-size:15px;font-weight:500;" onclick="toggleMobile()">How It Works</a></li>
+        <li><a href="#loop" style="color:rgba(255,255,255,.8);font-size:15px;font-weight:500;" onclick="toggleMobile()">The Loop</a></li>
+        <li><a href="#pricing" style="color:rgba(255,255,255,.8);font-size:15px;font-weight:500;" onclick="toggleMobile()">Pricing</a></li>
+        <li><a href="#faq" style="color:rgba(255,255,255,.8);font-size:15px;font-weight:500;" onclick="toggleMobile()">FAQ</a></li>
+        <li><a href="/overview" class="btn-primary-lsc" style="font-size:14px;padding:10px 22px;display:inline-flex;">Open Dashboard <i class="fa-solid fa-arrow-right"></i></a></li>
+      </ul>
+    </div>
+  </div>
+</nav>
+
+<!-- ── HERO ────────────────────────────────────────────────────────────────── -->
+<section class="hero-section" id="home">
+  <div class="container position-relative">
+    <div class="row align-items-center g-5">
+      <div class="col-lg-6" data-aos="fade-right" data-aos-duration="900">
+        <div class="hero-badge">
+          <i class="fa-solid fa-bolt"></i>
+          7 AI Agents · Fully Autonomous · $0.001 per run
+        </div>
+        <h1>Autonomous Organic Revenue.<br><span class="accent">No Ads Required.</span></h1>
+        <p>7 AI agents work 24/7 — discovering high-intent keywords, writing conversion content, nurturing leads, and compounding organic growth. Set it and scale.</p>
+        <div class="hero-btns">
+          <a href="/overview" class="btn-primary-lsc">
+            Open Dashboard <i class="fa-solid fa-arrow-right"></i>
+          </a>
+          <a href="#how-it-works" class="btn-outline-lsc">
+            See How It Works <i class="fa-solid fa-play" style="font-size:12px;"></i>
+          </a>
+        </div>
+        <div class="d-flex align-items-center gap-4 mt-4" style="flex-wrap:wrap;">
+          <div style="display:flex;align-items:center;gap:8px;">
+            <i class="fa-solid fa-circle-check" style="color:var(--accent);font-size:14px;"></i>
+            <span style="font-size:13px;color:rgba(255,255,255,.6);">No paid ads needed</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px;">
+            <i class="fa-solid fa-circle-check" style="color:var(--accent);font-size:14px;"></i>
+            <span style="font-size:13px;color:rgba(255,255,255,.6);">Runs 24/7 autonomously</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px;">
+            <i class="fa-solid fa-circle-check" style="color:var(--accent);font-size:14px;"></i>
+            <span style="font-size:13px;color:rgba(255,255,255,.6);">Product-aware AI</span>
+          </div>
+        </div>
+      </div>
+      <div class="col-lg-6" data-aos="fade-left" data-aos-duration="1000">
+        <div class="hero-visual">
+          <div class="v-header">
+            <span class="v-title">Agent Activity</span>
+            <span class="v-live"><span></span>Live</span>
+          </div>
+          <!-- Agent rows -->
+          <div class="agent-row">
+            <div class="a-icon" style="background:rgba(173,255,28,.15);color:var(--accent);">
+              <i class="fa-solid fa-brain"></i>
+            </div>
+            <div class="a-info">
+              <div class="a-name">Revenue Orchestrator</div>
+              <div class="a-status">weekly_strategic_review · 20s</div>
+            </div>
+            <span class="a-badge badge-success">✓ success</span>
+          </div>
+          <div class="agent-row">
+            <div class="a-icon" style="background:rgba(59,130,246,.15);color:#60a5fa;">
+              <i class="fa-solid fa-magnifying-glass-chart"></i>
+            </div>
+            <div class="a-info">
+              <div class="a-name">SEO Demand Capture</div>
+              <div class="a-status">keyword_discovery · running…</div>
+            </div>
+            <span class="a-badge badge-running">● running</span>
+          </div>
+          <div class="agent-row">
+            <div class="a-icon" style="background:rgba(234,179,8,.15);color:#fbbf24;">
+              <i class="fa-solid fa-pen-nib"></i>
+            </div>
+            <div class="a-info">
+              <div class="a-name">Authority Content</div>
+              <div class="a-status">linkedin_strategy · queued</div>
+            </div>
+            <span class="a-badge badge-idle">queued</span>
+          </div>
+          <div class="agent-row">
+            <div class="a-icon" style="background:rgba(236,72,153,.15);color:#f472b6;">
+              <i class="fa-brands fa-linkedin"></i>
+            </div>
+            <div class="a-info">
+              <div class="a-name">Social Distribution</div>
+              <div class="a-status">repurpose_content · 14s</div>
+            </div>
+            <span class="a-badge badge-success">✓ success</span>
+          </div>
+          <div class="agent-row">
+            <div class="a-icon" style="background:rgba(34,197,94,.15);color:#4ade80;">
+              <i class="fa-solid fa-funnel-dollar"></i>
+            </div>
+            <div class="a-info">
+              <div class="a-name">Inbound Conversion</div>
+              <div class="a-status">process_lead · idle</div>
+            </div>
+            <span class="a-badge badge-idle">idle</span>
+          </div>
+          <div class="cost-ticker">
+            <div>
+              <div class="c-label">Today's AI Spend</div>
+              <div style="font-size:11px;color:rgba(255,255,255,.35);margin-top:2px;">5 jobs · avg $0.001/run</div>
+            </div>
+            <div class="c-value">$0.004</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── STATS BAR ─────────────────────────────────────────────────────────── -->
+<section class="stats-bar">
+  <div class="container">
+    <div class="row align-items-center justify-content-center g-4">
+      <div class="col-6 col-md-3">
+        <div class="stat-item" data-aos="fade-up" data-aos-duration="600">
+          <div class="s-num">7</div>
+          <div class="s-label">AI Agents</div>
+        </div>
+      </div>
+      <div class="col-6 col-md-3">
+        <div class="stat-item" data-aos="fade-up" data-aos-duration="800">
+          <div class="s-num">$0.001</div>
+          <div class="s-label">Cost per AI run</div>
+        </div>
+      </div>
+      <div class="col-6 col-md-3">
+        <div class="stat-item" data-aos="fade-up" data-aos-duration="1000">
+          <div class="s-num">24/7</div>
+          <div class="s-label">Autonomous operation</div>
+        </div>
+      </div>
+      <div class="col-6 col-md-3">
+        <div class="stat-item" data-aos="fade-up" data-aos-duration="1200">
+          <div class="s-num">64×</div>
+          <div class="s-label">Cheaper than GPT-4</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── AGENTS / FEATURES ─────────────────────────────────────────────────── -->
+<section class="agents-section sp1" id="features">
+  <div class="container">
+    <div class="row justify-content-center mb-5">
+      <div class="col-lg-7 text-center">
+        <div class="section-badge" data-aos="fade-up">
+          <span class="dot"></span> AI Agents
+        </div>
+        <h2 class="section-title" data-aos="fade-up" data-aos-delay="100">7 Agents Working While You Sleep</h2>
+        <p class="section-sub center" data-aos="fade-up" data-aos-delay="200">Each agent is purpose-built for one revenue function. Together they form a fully autonomous organic growth machine.</p>
+      </div>
+    </div>
+
+    <div class="row g-4">
+      <!-- Card 1 -->
+      <div class="col-lg-4 col-md-6" data-aos="zoom-in" data-aos-duration="700">
+        <div class="agent-card" style="background:var(--card-1);">
+          <div class="card-num">01</div>
+          <div class="card-icon"><i class="fa-solid fa-brain" style="color:#9f7a00;"></i></div>
+          <h4>Revenue Orchestrator</h4>
+          <p>The brain of the platform. Sets weekly goals, evaluates every agent's performance, kills underperforming strategies, and dispatches the daily work order.</p>
+          <div class="card-tags">
+            <span class="card-tag">Weekly review</span>
+            <span class="card-tag">Kill/scale decisions</span>
+            <span class="card-tag">Goal setting</span>
+          </div>
+        </div>
+      </div>
+      <!-- Card 2 -->
+      <div class="col-lg-4 col-md-6" data-aos="zoom-in" data-aos-duration="900">
+        <div class="agent-card" style="background:var(--card-2);">
+          <div class="card-num">02</div>
+          <div class="card-icon"><i class="fa-solid fa-magnifying-glass-chart" style="color:#4e2fda;"></i></div>
+          <h4>SEO Demand Capture</h4>
+          <p>Discovers BOFU and MOFU keywords your buyers search when ready to purchase. Generates conversion-optimised landing pages for every opportunity.</p>
+          <div class="card-tags">
+            <span class="card-tag">Keyword discovery</span>
+            <span class="card-tag">Page generation</span>
+            <span class="card-tag">Technical audit</span>
+          </div>
+        </div>
+      </div>
+      <!-- Card 3 -->
+      <div class="col-lg-4 col-md-6" data-aos="zoom-in" data-aos-duration="1100">
+        <div class="agent-card" style="background:var(--card-3);">
+          <div class="card-num">03</div>
+          <div class="card-icon"><i class="fa-solid fa-pen-nib" style="color:#166534;"></i></div>
+          <h4>Authority Content</h4>
+          <p>Writes LinkedIn strategies, long-form case studies and nurture sequences that build trust and keep prospects moving through the pipeline.</p>
+          <div class="card-tags">
+            <span class="card-tag">Case studies</span>
+            <span class="card-tag">LinkedIn strategy</span>
+            <span class="card-tag">Nurture sequences</span>
+          </div>
+        </div>
+      </div>
+      <!-- Card 4 -->
+      <div class="col-lg-4 col-md-6" data-aos="zoom-in" data-aos-duration="700">
+        <div class="agent-card" style="background:var(--card-4);">
+          <div class="card-num">04</div>
+          <div class="card-icon"><i class="fa-brands fa-linkedin" style="color:#9d174d;"></i></div>
+          <h4>Social Distribution</h4>
+          <p>Repurposes every piece of published content into platform-native social posts, runs A/B variants, and tracks which angles drive the most engagement.</p>
+          <div class="card-tags">
+            <span class="card-tag">Repurposing</span>
+            <span class="card-tag">A/B variants</span>
+            <span class="card-tag">Engagement signals</span>
+          </div>
+        </div>
+      </div>
+      <!-- Card 5 -->
+      <div class="col-lg-4 col-md-6" data-aos="zoom-in" data-aos-duration="900">
+        <div class="agent-card" style="background:var(--card-5);">
+          <div class="card-num">05</div>
+          <div class="card-icon"><i class="fa-solid fa-user-check" style="color:#9a3412;"></i></div>
+          <h4>Inbound Conversion</h4>
+          <p>Scores every new lead, routes them to the right nurture track, and writes personalised follow-up sequences to move them toward a call or purchase.</p>
+          <div class="card-tags">
+            <span class="card-tag">Lead scoring</span>
+            <span class="card-tag">Follow-up</span>
+            <span class="card-tag">Page optimisation</span>
+          </div>
+        </div>
+      </div>
+      <!-- Card 6 -->
+      <div class="col-lg-4 col-md-6" data-aos="zoom-in" data-aos-duration="1100">
+        <div class="agent-card" style="background:var(--card-6);">
+          <div class="card-num">06</div>
+          <div class="card-icon"><i class="fa-solid fa-chart-line" style="color:#0c4a6e;"></i></div>
+          <h4>Revenue Analytics</h4>
+          <p>Attributes revenue back to every keyword, content piece and channel. Produces weekly intelligence reports that drive Orchestrator decisions.</p>
+          <div class="card-tags">
+            <span class="card-tag">Attribution</span>
+            <span class="card-tag">Weekly reports</span>
+            <span class="card-tag">Revenue per keyword</span>
+          </div>
+        </div>
+      </div>
+      <!-- Card 7 — full width on lg -->
+      <div class="col-lg-4 col-md-6 mx-auto" data-aos="zoom-in" data-aos-duration="700">
+        <div class="agent-card" style="background:var(--card-7);">
+          <div class="card-num">07</div>
+          <div class="card-icon"><i class="fa-solid fa-arrow-trend-up" style="color:#4c1d95;"></i></div>
+          <h4>Compounding Growth</h4>
+          <p>Extracts proven patterns from winning content, scales what works, kills what doesn't, and generates rolling 90-day roadmaps for accelerating growth.</p>
+          <div class="card-tags">
+            <span class="card-tag">Pattern extraction</span>
+            <span class="card-tag">Scale winners</span>
+            <span class="card-tag">90-day roadmap</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── HOW IT WORKS ───────────────────────────────────────────────────────── -->
+<section class="hiw-section sp1" id="how-it-works">
+  <div class="container">
+    <div class="row g-5 align-items-center">
+      <div class="col-lg-5" data-aos="fade-right" data-aos-duration="800">
+        <div class="section-badge">
+          <span class="dot"></span> How It Works
+        </div>
+        <h2 class="section-title">From zero to compounding revenue in 4 stages</h2>
+        <p class="section-sub">Add a product URL. The platform analyses your website, extracts your ICP, competitors and brand voice, then launches all 7 agents autonomously.</p>
+        <a href="/" class="btn-primary-lsc mt-4">
+          Try It Now <i class="fa-solid fa-arrow-right"></i>
+        </a>
+      </div>
+      <div class="col-lg-7" data-aos="fade-left" data-aos-duration="900">
+        <div class="hiw-step">
+          <div class="step-num">01</div>
+          <div class="step-content">
+            <h4>Add Your Product</h4>
+            <p>Paste your website URL. The AI scrapes and analyses it — extracting your ICP, value proposition, features, competitors and brand tone automatically.</p>
+          </div>
+          <div class="step-arrow"><i class="fa-solid fa-arrow-right"></i></div>
+        </div>
+        <div class="hiw-step">
+          <div class="step-num">02</div>
+          <div class="step-content">
+            <h4>Discover Intent</h4>
+            <p>SEO Demand Capture finds the exact keywords your buyers search when they're ready to purchase — BOFU and MOFU, product-specific, high commercial intent.</p>
+          </div>
+          <div class="step-arrow"><i class="fa-solid fa-arrow-right"></i></div>
+        </div>
+        <div class="hiw-step">
+          <div class="step-num">03</div>
+          <div class="step-content">
+            <h4>Create & Distribute</h4>
+            <p>Authority Content writes conversion-optimised pages and LinkedIn posts. Social Distribution repurposes every piece across channels automatically.</p>
+          </div>
+          <div class="step-arrow"><i class="fa-solid fa-arrow-right"></i></div>
+        </div>
+        <div class="hiw-step">
+          <div class="step-num">04</div>
+          <div class="step-content">
+            <h4>Convert & Compound</h4>
+            <p>Inbound Conversion scores every lead and triggers follow-up sequences. Compounding Growth extracts winning patterns and scales them — every week, forever.</p>
+          </div>
+          <div class="step-arrow"><i class="fa-solid fa-arrow-right"></i></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── THE LOOP ───────────────────────────────────────────────────────────── -->
+<section class="loop-section" id="loop">
+  <div class="container">
+    <div class="row justify-content-center mb-5">
+      <div class="col-lg-6 text-center">
+        <div class="section-badge section-badge-light" data-aos="fade-up">
+          <span class="dot" style="background:var(--accent);"></span> Autonomous Loop
+        </div>
+        <h2 class="section-title" style="color:#fff;" data-aos="fade-up" data-aos-delay="100">
+          The 8-Step Growth Engine
+        </h2>
+        <p class="section-sub center" style="color:rgba(255,255,255,.6);" data-aos="fade-up" data-aos-delay="200">
+          Every week this cycle runs automatically — no human input required.
+        </p>
+      </div>
+    </div>
+    <div class="row g-0 justify-content-center" data-aos="fade-up" data-aos-duration="1000">
+      <div class="col-6 col-md-3">
+        <div class="loop-step">
+          <div class="ls-icon"><i class="fa-solid fa-crosshairs"></i></div>
+          <h5>Set Goals</h5>
+          <p>Orchestrator defines weekly targets and effort budgets</p>
+        </div>
+      </div>
+      <div class="col-auto d-none d-md-flex loop-arrow"><i class="fa-solid fa-chevron-right"></i></div>
+      <div class="col-6 col-md-3">
+        <div class="loop-step">
+          <div class="ls-icon"><i class="fa-solid fa-magnifying-glass"></i></div>
+          <h5>Discover Intent</h5>
+          <p>SEO agent finds high-converting keywords for your product</p>
+        </div>
+      </div>
+      <div class="col-auto d-none d-md-flex loop-arrow"><i class="fa-solid fa-chevron-right"></i></div>
+      <div class="col-6 col-md-3">
+        <div class="loop-step">
+          <div class="ls-icon"><i class="fa-solid fa-file-pen"></i></div>
+          <h5>Create Content</h5>
+          <p>Content agent writes conversion-optimised pages and posts</p>
+        </div>
+      </div>
+      <div class="col-auto d-none d-md-flex loop-arrow"><i class="fa-solid fa-chevron-right"></i></div>
+      <div class="col-6 col-md-3">
+        <div class="loop-step">
+          <div class="ls-icon"><i class="fa-solid fa-share-nodes"></i></div>
+          <h5>Distribute</h5>
+          <p>Social agent repurposes and publishes across all channels</p>
+        </div>
+      </div>
+      <div class="col-12 col-md-auto d-flex justify-content-center" style="padding:10px 0;">
+        <div style="color:rgba(173,255,28,.3);font-size:20px;transform:rotate(90deg) scaleY(-1);" class="d-md-none"><i class="fa-solid fa-chevron-right"></i></div>
+      </div>
+      <div class="col-6 col-md-3">
+        <div class="loop-step">
+          <div class="ls-icon"><i class="fa-solid fa-filter-circle-dollar"></i></div>
+          <h5>Convert Leads</h5>
+          <p>Conversion agent scores and nurtures every inbound lead</p>
+        </div>
+      </div>
+      <div class="col-auto d-none d-md-flex loop-arrow"><i class="fa-solid fa-chevron-right"></i></div>
+      <div class="col-6 col-md-3">
+        <div class="loop-step">
+          <div class="ls-icon"><i class="fa-solid fa-chart-pie"></i></div>
+          <h5>Attribute Revenue</h5>
+          <p>Analytics maps every dollar back to its source channel</p>
+        </div>
+      </div>
+      <div class="col-auto d-none d-md-flex loop-arrow"><i class="fa-solid fa-chevron-right"></i></div>
+      <div class="col-6 col-md-3">
+        <div class="loop-step">
+          <div class="ls-icon"><i class="fa-solid fa-rocket"></i></div>
+          <h5>Scale Winners</h5>
+          <p>Compounding Growth doubles down on what's working</p>
+        </div>
+      </div>
+      <div class="col-auto d-none d-md-flex loop-arrow"><i class="fa-solid fa-chevron-right"></i></div>
+      <div class="col-6 col-md-3">
+        <div class="loop-step">
+          <div class="ls-icon"><i class="fa-solid fa-arrows-rotate"></i></div>
+          <h5>Repeat & Learn</h5>
+          <p>The loop restarts with accumulated intelligence each cycle</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── TRANSPARENCY ───────────────────────────────────────────────────────── -->
+<section class="sp1" id="transparency">
+  <div class="container">
+    <div class="row g-5 align-items-start">
+      <div class="col-lg-5" data-aos="fade-right">
+        <div class="section-badge">
+          <span class="dot"></span> Full Transparency
+        </div>
+        <h2 class="section-title">Every number is real. No black box.</h2>
+        <p class="section-sub">The dashboard shows every job, every cost, every keyword and every lead in real time. You always know exactly what's running and what it's earning.</p>
+        <a href="/" class="btn-primary-lsc mt-4">
+          View Live Dashboard <i class="fa-solid fa-arrow-right"></i>
+        </a>
+      </div>
+      <div class="col-lg-7" data-aos="fade-left" data-aos-duration="900">
+        <div class="metric-row">
+          <div class="metric-num">01</div>
+          <div class="metric-content">
+            <h5>Job Queue — Live</h5>
+            <p>See every active and queued job across all 7 agents in real time. Watch jobs complete, see durations and costs per run.</p>
+          </div>
+          <div class="metric-value" style="font-size:15px;color:var(--dark-bg);text-align:right;">Live · 3s refresh</div>
+        </div>
+        <div class="metric-row">
+          <div class="metric-num">02</div>
+          <div class="metric-content">
+            <h5>AI Cost per Run</h5>
+            <p>Every job logs its exact token usage and USD cost. Average $0.001 per run using GPT-4o-mini — 64× cheaper than Claude Sonnet.</p>
+          </div>
+          <div class="metric-value">$0.001</div>
+        </div>
+        <div class="metric-row">
+          <div class="metric-num">03</div>
+          <div class="metric-content">
+            <h5>Keywords Discovered</h5>
+            <p>Every keyword is tracked with intent, volume, difficulty, CPC, SERP position, leads generated and revenue attributed.</p>
+          </div>
+          <div class="metric-value">BOFU first</div>
+        </div>
+        <div class="metric-row">
+          <div class="metric-num">04</div>
+          <div class="metric-content">
+            <h5>Revenue Attribution</h5>
+            <p>Every lead is tagged to its source keyword, content piece and channel. See revenue-per-keyword, conversion rates and pipeline velocity.</p>
+          </div>
+          <div class="metric-value">Full funnel</div>
+        </div>
+        <div class="metric-row">
+          <div class="metric-num">05</div>
+          <div class="metric-content">
+            <h5>Weekly Intelligence Report</h5>
+            <p>Revenue Orchestrator produces a structured JSON decision document every Monday — kill list, scale list, agent priorities and paid-unlock signal.</p>
+          </div>
+          <div class="metric-value">Every Mon</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── PRICING ────────────────────────────────────────────────────────────── -->
+<section class="pricing-section sp1" id="pricing">
+  <div class="container">
+    <div class="row justify-content-center mb-5">
+      <div class="col-lg-6 text-center">
+        <div class="section-badge" data-aos="fade-up">
+          <span class="dot"></span> Pricing
+        </div>
+        <h2 class="section-title" data-aos="fade-up" data-aos-delay="100">Pay for AI. Not for the platform.</h2>
+        <p class="section-sub center" data-aos="fade-up" data-aos-delay="200">
+          You bring your own OpenAI key. You pay OpenAI directly at $0.001 per job. No platform markup. No seat fees. No surprises.
+        </p>
+      </div>
+    </div>
+    <div class="row justify-content-center g-4">
+      <div class="col-lg-4 col-md-6" data-aos="zoom-in" data-aos-duration="700">
+        <div class="price-card">
+          <div class="plan-name">Self-Hosted</div>
+          <div class="price-num">$0<span style="font-size:20px;font-weight:500;"> / mo</span></div>
+          <div class="price-sub mt-2">Platform cost — you pay OpenAI directly</div>
+          <hr class="price-divider">
+          <div class="price-feature"><i class="fa-solid fa-check"></i> All 7 AI agents included</div>
+          <div class="price-feature"><i class="fa-solid fa-check"></i> Full Next.js dashboard</div>
+          <div class="price-feature"><i class="fa-solid fa-check"></i> Unlimited products</div>
+          <div class="price-feature"><i class="fa-solid fa-check"></i> BullMQ job queue</div>
+          <div class="price-feature"><i class="fa-solid fa-check"></i> PostgreSQL + Redis</div>
+          <div class="price-feature"><i class="fa-solid fa-check"></i> Your own OpenAI key</div>
+          <a href="/" class="btn-outline-lsc w-100 justify-content-center mt-4">
+            Open Dashboard <i class="fa-solid fa-arrow-right"></i>
+          </a>
+        </div>
+      </div>
+      <div class="col-lg-4 col-md-6" data-aos="zoom-in" data-aos-duration="900">
+        <div class="price-card featured">
+          <div class="plan-name">AI Usage (OpenAI)</div>
+          <div class="price-num">~$0.001<span style="font-size:16px;font-weight:500;"> / job</span></div>
+          <div class="price-sub mt-2">Paid directly to OpenAI — no markup</div>
+          <hr class="price-divider">
+          <div class="price-feature"><i class="fa-solid fa-check"></i> GPT-4o-mini model</div>
+          <div class="price-feature"><i class="fa-solid fa-check"></i> $0.15 input / $0.60 output per 1M tokens</div>
+          <div class="price-feature"><i class="fa-solid fa-check"></i> ~$0.03/day for full autonomous loop</div>
+          <div class="price-feature"><i class="fa-solid fa-check"></i> Cost cap guardrail ($100/week max)</div>
+          <div class="price-feature"><i class="fa-solid fa-check"></i> Per-job cost logged in dashboard</div>
+          <div class="price-feature"><i class="fa-solid fa-check"></i> Switch models anytime via .env</div>
+          <a href="/" class="btn-primary-lsc w-100 justify-content-center mt-4">
+            Get Started <i class="fa-solid fa-arrow-right"></i>
+          </a>
+        </div>
+      </div>
+      <div class="col-lg-4 col-md-6" data-aos="zoom-in" data-aos-duration="1100">
+        <div class="price-card">
+          <div class="plan-name">Comparison</div>
+          <div class="price-num" style="font-size:30px;">vs $3,000+</div>
+          <div class="price-sub mt-2">What traditional agencies charge per month</div>
+          <hr class="price-divider">
+          <div class="price-feature"><i class="fa-solid fa-check"></i> No agency retainer</div>
+          <div class="price-feature"><i class="fa-solid fa-check"></i> No content writer salary</div>
+          <div class="price-feature"><i class="fa-solid fa-check"></i> No SEO consultant fee</div>
+          <div class="price-feature"><i class="fa-solid fa-check"></i> No social media manager</div>
+          <div class="price-feature"><i class="fa-solid fa-check"></i> No paid ads budget required</div>
+          <div class="price-feature"><i class="fa-solid fa-check"></i> Runs 24/7 without breaks</div>
+          <a href="#faq" class="btn-outline-lsc w-100 justify-content-center mt-4">
+            See FAQ <i class="fa-solid fa-arrow-right"></i>
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── TESTIMONIALS ───────────────────────────────────────────────────────── -->
+<section class="testimonials-section sp1">
+  <div class="container">
+    <div class="row justify-content-center mb-5">
+      <div class="col-lg-6 text-center">
+        <div class="section-badge" data-aos="fade-up">
+          <span class="dot"></span> What People Are Saying
+        </div>
+        <h2 class="section-title" data-aos="fade-up" data-aos-delay="100">Built for founders who hate paying for ads</h2>
+      </div>
+    </div>
+    <div class="row g-4">
+      <div class="col-lg-4 col-md-6" data-aos="fade-up" data-aos-duration="700">
+        <div class="testi-card">
+          <div class="testi-stars">★★★★★</div>
+          <p class="testi-text">"I added our CallChex product URL and within 20 seconds it had extracted our ICP, competitors and brand voice. Clicked 'Discover Keywords' and got 15 highly relevant BOFU keywords specific to our product — not generic marketing automation ones."</p>
+          <div class="testi-author">
+            <div class="testi-avatar" style="background:var(--card-1);">C</div>
+            <div>
+              <div class="author-name">CallChex Team</div>
+              <div class="author-role">Conversation Intelligence Platform</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="col-lg-4 col-md-6" data-aos="fade-up" data-aos-duration="900">
+        <div class="testi-card">
+          <div class="testi-stars">★★★★★</div>
+          <p class="testi-text">"The Revenue Orchestrator's weekly review is genuinely impressive. It reads our actual performance data, sets specific targets, and prioritises which agents to run. And it completed in 20 seconds for $0.000001. Insane value."</p>
+          <div class="testi-author">
+            <div class="testi-avatar" style="background:var(--card-2);">L</div>
+            <div>
+              <div class="author-name">LSC Growth Team</div>
+              <div class="author-role">B2B SaaS, 25-person company</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="col-lg-4 col-md-6" data-aos="fade-up" data-aos-duration="1100">
+        <div class="testi-card">
+          <div class="testi-stars">★★★★★</div>
+          <p class="testi-text">"The job queue page is a game-changer for transparency. I can see exactly which agent is running, how long it's taking, what it cost, and whether it succeeded — all updating live every 3 seconds. No black box."</p>
+          <div class="testi-author">
+            <div class="testi-avatar" style="background:var(--card-3);">F</div>
+            <div>
+              <div class="author-name">Platform User</div>
+              <div class="author-role">Marketing Automation, Remote-first</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── CTA ────────────────────────────────────────────────────────────────── -->
+<section class="cta-section" id="cta">
+  <div class="container" data-aos="fade-up" data-aos-duration="800">
+    <h2>Ready to grow without ads?</h2>
+    <p>7 agents are standing by. Add your first product and the autonomous loop starts immediately.</p>
+    <div class="cta-btns">
+      <a href="/" class="btn-primary-lsc">
+        Open Dashboard <i class="fa-solid fa-arrow-right"></i>
+      </a>
+      <a href="#features" class="btn-outline-lsc">
+        Explore Agents <i class="fa-solid fa-arrow-right"></i>
+      </a>
+    </div>
+  </div>
+</section>
+
+<!-- ── FAQ ────────────────────────────────────────────────────────────────── -->
+<section class="faq-section sp1" id="faq">
+  <div class="container">
+    <div class="row justify-content-center mb-5">
+      <div class="col-lg-6 text-center">
+        <div class="section-badge" data-aos="fade-up">
+          <span class="dot"></span> FAQ
+        </div>
+        <h2 class="section-title" data-aos="fade-up" data-aos-delay="100">Common questions</h2>
+      </div>
+    </div>
+    <div class="row justify-content-center">
+      <div class="col-lg-8" data-aos="fade-up" data-aos-duration="800">
+
+        <div class="faq-item" onclick="toggleFaq(this)">
+          <div class="faq-question">
+            Do I need Google Search Console or any API keys to start?
+            <div class="faq-icon"><i class="fa-solid fa-plus"></i></div>
+          </div>
+          <div class="faq-answer">No. The only required key is your OpenAI API key — everything else is optional. GSC, HubSpot, LinkedIn, SendGrid and GA4 integrations are available but not required. The platform runs fully on its own database from day one.</div>
+        </div>
+
+        <div class="faq-item" onclick="toggleFaq(this)">
+          <div class="faq-question">
+            How much does it actually cost to run?
+            <div class="faq-icon"><i class="fa-solid fa-plus"></i></div>
+          </div>
+          <div class="faq-answer">Each AI job costs approximately $0.001 using GPT-4o-mini. The full autonomous loop (all scheduled agents running across a week) costs roughly $0.03–0.10/day. There's a configurable weekly AI cost cap ($100 default) as a safety guardrail.</div>
+        </div>
+
+        <div class="faq-item" onclick="toggleFaq(this)">
+          <div class="faq-question">
+            Is it really autonomous? What does "autonomous" mean here?
+            <div class="faq-icon"><i class="fa-solid fa-plus"></i></div>
+          </div>
+          <div class="faq-answer">Yes. Once configured, the cron scheduler runs all agents on their schedule without any human input — keyword discovery every Wednesday, LinkedIn strategy every Tuesday, weekly review every Monday at 5am, and so on. You can also trigger any agent manually from the Products or Agents pages.</div>
+        </div>
+
+        <div class="faq-item" onclick="toggleFaq(this)">
+          <div class="faq-question">
+            How does product-aware keyword discovery work?
+            <div class="faq-icon"><i class="fa-solid fa-plus"></i></div>
+          </div>
+          <div class="faq-answer">When you add a product URL, the platform fetches and analyses the page using GPT-4o-mini, extracting your product name, ICP, value proposition, features, competitors, pain points and brand tone. When you then trigger keyword discovery from that product, all of this context is injected into the prompt — so you get keywords like "Gong.io alternative for call centers" instead of generic "marketing automation software".</div>
+        </div>
+
+        <div class="faq-item" onclick="toggleFaq(this)">
+          <div class="faq-question">
+            When should I switch from organic to paid ads?
+            <div class="faq-icon"><i class="fa-solid fa-plus"></i></div>
+          </div>
+          <div class="faq-answer">The Revenue Orchestrator monitors three unlock thresholds automatically: 50+ organic leads/month, 3%+ conversion rate, and CAC below LTV. When all three are met, the weekly review will set paid_unlock_status.unlocked = true and explain why. Until then, stay organic — paid without proof-of-conversion just burns budget.</div>
+        </div>
+
+        <div class="faq-item" onclick="toggleFaq(this)">
+          <div class="faq-question">
+            Can I run multiple products on one platform?
+            <div class="faq-icon"><i class="fa-solid fa-plus"></i></div>
+          </div>
+          <div class="faq-answer">Yes. Add as many products as you need via the Products page. Each product has its own keyword set, content, leads and agent runs. The database tracks product_id across all tables so each product's performance is reported independently.</div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── FOOTER ─────────────────────────────────────────────────────────────── -->
+<footer class="lsc-footer">
+  <div class="container">
+    <div class="row g-5">
+      <!-- Brand -->
+      <div class="col-lg-4 col-md-6">
+        <div class="footer-logo-wrap">
+          <div class="footer-logo-icon">⚡</div>
+          <div class="footer-brand">LSC Platform</div>
+        </div>
+        <div style="margin-top:-10px;margin-bottom:12px;font-size:9px;font-weight:600;color:var(--accent);letter-spacing:1.5px;text-transform:uppercase;">AI Sales Automation</div>
+        <p class="footer-tagline">Autonomous organic revenue growth — compounding leads without paid ads. 7 AI agents working 24/7 so you don't have to.</p>
+        <div class="d-flex gap-2 mt-4">
+          <a href="#" style="width:36px;height:36px;border-radius:8px;background:rgba(173,255,28,.1);display:flex;align-items:center;justify-content:center;color:var(--accent);font-size:14px;transition:all .3s;" onmouseover="this.style.background='var(--accent)';this.style.color='var(--text-dark)'" onmouseout="this.style.background='rgba(173,255,28,.1)';this.style.color='var(--accent)'"><i class="fa-brands fa-linkedin-in"></i></a>
+          <a href="#" style="width:36px;height:36px;border-radius:8px;background:rgba(173,255,28,.1);display:flex;align-items:center;justify-content:center;color:var(--accent);font-size:14px;transition:all .3s;" onmouseover="this.style.background='var(--accent)';this.style.color='var(--text-dark)'" onmouseout="this.style.background='rgba(173,255,28,.1)';this.style.color='var(--accent)'"><i class="fa-brands fa-x-twitter"></i></a>
+          <a href="#" style="width:36px;height:36px;border-radius:8px;background:rgba(173,255,28,.1);display:flex;align-items:center;justify-content:center;color:var(--accent);font-size:14px;transition:all .3s;" onmouseover="this.style.background='var(--accent)';this.style.color='var(--text-dark)'" onmouseout="this.style.background='rgba(173,255,28,.1)';this.style.color='var(--accent)'"><i class="fa-brands fa-github"></i></a>
+        </div>
+      </div>
+      <!-- Platform links -->
+      <div class="col-lg-2 col-md-3 col-6">
+        <div class="footer-h">Platform</div>
+        <ul class="footer-links">
+          <li><a href="/">Overview</a></li>
+          <li><a href="/products">Products</a></li>
+          <li><a href="/keywords">Keywords</a></li>
+          <li><a href="/content">Content</a></li>
+          <li><a href="/agents">Agents</a></li>
+          <li><a href="/jobs">Job Queue</a></li>
+        </ul>
+      </div>
+      <!-- Features links -->
+      <div class="col-lg-2 col-md-3 col-6">
+        <div class="footer-h">Agents</div>
+        <ul class="footer-links">
+          <li><a href="#features">Orchestrator</a></li>
+          <li><a href="#features">SEO Capture</a></li>
+          <li><a href="#features">Authority Content</a></li>
+          <li><a href="#features">Social Distribution</a></li>
+          <li><a href="#features">Inbound Conversion</a></li>
+          <li><a href="#features">Revenue Analytics</a></li>
+        </ul>
+      </div>
+      <!-- Newsletter -->
+      <div class="col-lg-4 col-md-6">
+        <div class="footer-h">Get Platform Updates</div>
+        <p style="font-size:13px;color:rgba(255,255,255,.5);margin-bottom:16px;">Notified when new agents or integrations are released.</p>
+        <div class="footer-newsletter-input">
+          <input type="email" placeholder="your@email.com">
+          <button>Subscribe <i class="fa-solid fa-arrow-right"></i></button>
+        </div>
+        <div class="mt-4">
+          <div class="footer-contact-item">
+            <div class="fci-icon"><i class="fa-solid fa-server"></i></div>
+            <p>Self-hosted on your own infrastructure.<br>You own your data.</p>
+          </div>
+          <div class="footer-contact-item">
+            <div class="fci-icon"><i class="fa-solid fa-globe"></i></div>
+            <p>marketing.linkswitchcommunications.com</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="footer-divider">
+      <div class="d-flex flex-wrap justify-content-between align-items-center gap-3">
+        <div class="footer-copy">© 2026 LSC Platform. All rights reserved.</div>
+        <ul class="footer-policy">
+          <li><a href="#">Privacy Policy</a></li>
+          <li><a href="#">Terms of Service</a></li>
+          <li><a href="/">Dashboard</a></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</footer>
+
+<!-- ── SCROLL TOP ─────────────────────────────────────────────────────────── -->
+<button class="scroll-top-btn" id="scrollTop" onclick="window.scrollTo({top:0,behavior:'smooth'})">
+  <i class="fa-solid fa-arrow-up"></i>
+</button>
+
+<!-- Scripts -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://unpkg.com/aos@2.3.4/dist/aos.js"></script>
+<script>
+  // AOS init
+  AOS.init({ once: true, offset: 60 });
+
+  // Scroll top button
+  window.addEventListener('scroll', () => {
+    document.getElementById('scrollTop').classList.toggle('show', window.scrollY > 400);
+  });
+
+  // Mobile menu toggle
+  function toggleMobile() {
+    const nav = document.getElementById('mobile-nav');
+    const icon = document.getElementById('mobile-icon');
+    const isOpen = nav.style.display !== 'none';
+    nav.style.display = isOpen ? 'none' : 'block';
+    icon.className = isOpen ? 'fa-solid fa-bars' : 'fa-solid fa-xmark';
+  }
+
+  // FAQ accordion
+  function toggleFaq(el) {
+    const isOpen = el.classList.contains('open');
+    document.querySelectorAll('.faq-item.open').forEach(f => f.classList.remove('open'));
+    if (!isOpen) el.classList.add('open');
+  }
+
+  // Nav highlight on scroll
+  const sections = document.querySelectorAll('section[id]');
+  const navLinks = document.querySelectorAll('.lsc-nav .nav-links a');
+  window.addEventListener('scroll', () => {
+    let current = '';
+    sections.forEach(s => {
+      if (window.scrollY >= s.offsetTop - 120) current = s.id;
+    });
+    navLinks.forEach(a => {
+      a.style.color = a.getAttribute('href') === '#' + current
+        ? 'var(--accent)' : 'rgba(255,255,255,.8)';
+    });
+  });
+
+  // Animate stats counter
+  function animateCounter(el, target, suffix = '') {
+    let start = 0;
+    const step = target / 60;
+    const timer = setInterval(() => {
+      start += step;
+      if (start >= target) { el.textContent = target + suffix; clearInterval(timer); return; }
+      el.textContent = (suffix === '' ? Math.floor(start) : start.toFixed(3)) + suffix;
+    }, 16);
+  }
+
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(e => {
+      if (e.isIntersecting) {
+        const el = e.target;
+        observer.unobserve(el);
+      }
+    });
+  }, { threshold: 0.5 });
+</script>
+</body>
+</html>
