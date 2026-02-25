@@ -12,18 +12,23 @@ services:
     environment:
       POSTGRES_DB:       ${DB_NAME:-lsc_marketing}
       POSTGRES_USER:     ${DB_USER:-lsc_user}
-      POSTGRES_PASSWORD: ${DB_PASSWORD:-lsc_password}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./database/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql
+      - ./database/migrations:/docker-entrypoint-initdb.d/migrations
       - ./database/seeds:/docker-entrypoint-initdb.d/seeds
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-lsc_user}"]
       interval: 10s
       timeout: 5s
       retries: 5
+    deploy:
+      resources:
+        limits:
+          memory: 512m
 
   # ─────────────────────────────────────────────
   # Redis — Job queues + caching
@@ -32,9 +37,14 @@ services:
     image: redis:7-alpine
     container_name: lsc_redis
     restart: unless-stopped
-    command: redis-server --maxmemory 256mb --maxmemory-policy allkeys-lru
+    command: >
+      redis-server
+      --maxmemory 256mb
+      --maxmemory-policy allkeys-lru
+      --appendonly yes
+      --requirepass ${REDIS_PASSWORD:-}
     ports:
-      - "6379:6379"
+      - "127.0.0.1:6379:6379"
     volumes:
       - redis_data:/data
     healthcheck:
@@ -42,6 +52,10 @@ services:
       interval: 10s
       timeout: 3s
       retries: 5
+    deploy:
+      resources:
+        limits:
+          memory: 384m
 
   # ─────────────────────────────────────────────
   # Orchestrator — Node.js Brain + Cron Scheduler
@@ -50,18 +64,31 @@ services:
     build:
       context: ./orchestrator
       dockerfile: ../docker/Dockerfile.orchestrator
+      args:
+        NODE_ENV: production
     container_name: lsc_orchestrator
     restart: unless-stopped
     depends_on:
       postgres: { condition: service_healthy }
       redis:    { condition: service_healthy }
     env_file: .env
+    environment:
+      NODE_ENV: production
     ports:
-      - "3001:3001"
+      - "127.0.0.1:4001:4001"
     volumes:
-      - ./orchestrator:/app
       - /var/log/lsc:/var/log/lsc
     command: node server.js
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:4001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+    deploy:
+      resources:
+        limits:
+          memory: 512m
 
   # ─────────────────────────────────────────────
   # Workers — BullMQ Job Processors
@@ -70,14 +97,17 @@ services:
     build:
       context: ./orchestrator
       dockerfile: ../docker/Dockerfile.orchestrator
+      args:
+        NODE_ENV: production
     container_name: lsc_workers
     restart: unless-stopped
     depends_on:
       postgres: { condition: service_healthy }
       redis:    { condition: service_healthy }
     env_file: .env
+    environment:
+      NODE_ENV: production
     volumes:
-      - ./orchestrator:/app
       - /var/log/lsc:/var/log/lsc
     command: node queues/worker-runner.js
     deploy:
@@ -86,7 +116,7 @@ services:
           memory: 1g
 
   # ─────────────────────────────────────────────
-  # Dashboard — Next.js
+  # Dashboard — Next.js (standalone)
   # ─────────────────────────────────────────────
   dashboard:
     build:
@@ -96,12 +126,24 @@ services:
     restart: unless-stopped
     depends_on:
       - orchestrator
+    env_file: .env
     environment:
-      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:3001}
+      NODE_ENV: production
+      PORT: 4002
+      HOSTNAME: 0.0.0.0
     ports:
-      - "3000:3000"
+      - "127.0.0.1:4002:4002"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:4002/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+    deploy:
+      resources:
+        limits:
+          memory: 384m
 
-  # ─────────────────────────────────────────────
   # ─────────────────────────────────────────────
   # Python Analytics API
   # ─────────────────────────────────────────────
@@ -115,10 +157,21 @@ services:
       postgres: { condition: service_healthy }
     env_file: .env
     ports:
-      - "8000:8000"
+      - "127.0.0.1:8000:8000"
     environment:
       ANALYTICS_PORT: 8000
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    deploy:
+      resources:
+        limits:
+          memory: 512m
 
+  # ─────────────────────────────────────────────
   # BullMQ Board — Queue monitoring UI
   # ─────────────────────────────────────────────
   bull-board:
@@ -126,17 +179,24 @@ services:
     container_name: lsc_bull_board
     restart: unless-stopped
     ports:
-      - "3002:3000"
+      - "127.0.0.1:3002:3000"
     environment:
       REDIS_HOST: redis
       REDIS_PORT: 6379
     depends_on:
       - redis
+    deploy:
+      resources:
+        limits:
+          memory: 128m
 
 volumes:
   postgres_data:
+    driver: local
   redis_data:
+    driver: local
 
 networks:
   default:
     name: lsc_network
+    driver: bridge

@@ -44,6 +44,9 @@ export const config = {
     },
     slack: {
       webhookUrl: process.env.SLACK_WEBHOOK_URL || '',
+      botToken:   process.env.SLACK_BOT_TOKEN   || '',
+      channelAlerts: process.env.SLACK_CHANNEL_ALERTS || '#sales-alerts',
+      channelDigest: process.env.SLACK_CHANNEL_DIGEST || '#marketing',
     },
     twilio: {
       accountSid:  process.env.TWILIO_ACCOUNT_SID  || '',
@@ -90,5 +93,30 @@ export const config = {
     valueProposition: process.env.VALUE_PROP    || 'Autonomous revenue growth without paid ads',
     targetMrrUsd:   parseFloat(process.env.TARGET_MRR_USD  || '50000'),
     avgDealSizeUsd: parseFloat(process.env.AVG_DEAL_SIZE_USD || '2000'),
+    competitors:    (process.env.COMPETITORS || '').split(',').map(s => s.trim()).filter(Boolean),
   },
 };
+
+// ─────────────────────────────────────────────
+// Startup validation
+// ─────────────────────────────────────────────
+
+const CRITICAL_VARS = ['DB_HOST', 'DB_USER', 'DB_PASSWORD', 'DB_NAME', 'REDIS_HOST', 'ANTHROPIC_API_KEY'];
+const WARN_VARS     = ['SENDGRID_API_KEY', 'HUBSPOT_API_KEY', 'LINKEDIN_ACCESS_TOKEN'];
+
+const missingCritical = CRITICAL_VARS.filter(v => !process.env[v]);
+if (missingCritical.length > 0) {
+  throw new Error(
+    `[config] Missing critical environment variables: ${missingCritical.join(', ')}. ` +
+    'Orchestrator cannot start without these. Set them in your .env file.'
+  );
+}
+
+const missingWarn = WARN_VARS.filter(v => !process.env[v]);
+if (missingWarn.length > 0) {
+  // Use console.warn here — logger isn't initialised yet at config load time
+  console.warn(
+    `[config] WARNING: Optional integration env vars not set: ${missingWarn.join(', ')}. ` +
+    'Those integrations will run in mock/fallback mode.'
+  );
+}

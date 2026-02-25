@@ -1,275 +1,328 @@
 """
 Lead Scoring Enhancement Router
 
-Enhances the base composite score with:
-- ICP firmographic matching
-- Behavioral signal weighting
-- Intent velocity (how fast engagement is accelerating)
-- LTV prediction
+Enhances raw lead signals into a rich composite score with:
+- Weighted composite score (intent 40%, fit 35%, engagement 25%)
+- Enterprise / title / content-download bonus multipliers
+- Segment classification: hot / warm / cool / cold
+- Top-3 signal extraction
+- ICP fit percentage
+- Velocity score (rate of engagement growth)
+- Recommended action: immediate_outreach | nurture_sequence |
+                       educational_content | disqualify
+
+Endpoint: POST /scoring/enhance
 """
 
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
-from typing import Optional, List, Dict
+from typing import List, Optional, Dict, Any
 
 router = APIRouter()
 
 
-class LeadScoringRequest(BaseModel):
-    email:              str
-    full_name:          Optional[str] = None
-    company:            Optional[str] = None
-    job_title:          Optional[str] = None
-    company_size:       Optional[int] = None
-    source_keyword:     Optional[str] = None
-    source_page_type:   Optional[str] = None  # landing_page|comparison|blog|pricing
-    pages_visited:      int = 0
-    email_opens:        int = 0
-    email_clicks:       int = 0
-    visited_pricing:    bool = False
-    calendar_visits:    int = 0
-    content_consumed:   int = 0
-    days_since_signup:  int = 0
-    # ICP definition
-    icp_titles:         List[str] = []
-    icp_company_sizes:  List[str] = []  # e.g. ["10-50","50-200"]
+# ─────────────────────────────────────────────
+# Request / Response Models
+# ─────────────────────────────────────────────
+
+class LeadInput(BaseModel):
+    """A single lead record to be scored."""
+
+    id:                    str
+    intent_score:          float = Field(..., ge=0, le=100, description="Raw intent signal (0-100)")
+    fit_score:             float = Field(..., ge=0, le=100, description="Raw ICP fit signal (0-100)")
+    engagement_score:      float = Field(..., ge=0, le=100, description="Raw engagement signal (0-100)")
+    company_size:          Optional[int]   = None
+    job_title:             Optional[str]   = None
+    industry:              Optional[str]   = None
+    pages_visited:         int   = Field(0, ge=0)
+    email_opens:           int   = Field(0, ge=0)
+    content_downloads:     int   = Field(0, ge=0)
+    time_on_site_min:      float = Field(0.0, ge=0)
+    days_since_first_touch: int  = Field(0, ge=0)
 
 
-class ScoringResult(BaseModel):
+class EnhancedLead(BaseModel):
+    """Enriched scoring output for a single lead."""
+
+    id:                 str
     composite_score:    float
-    intent_score:       float
-    fit_score:          float
-    engagement_score:   float
+    segment:            str
+    top_signals:        List[str]
+    recommended_action: str
+    icp_fit_pct:        float
     velocity_score:     float
-    ltv_estimate:       float
-    stage:              str
-    routing:            str
-    score_breakdown:    Dict[str, float]
-    recommended_actions: List[str]
 
 
-@router.post("/enhance", response_model=ScoringResult)
-async def enhance_score(req: LeadScoringRequest):
-    """Compute an enhanced multi-dimensional lead score."""
+class ScoringRequest(BaseModel):
+    """Batch scoring request."""
 
-    # ── FIT SCORE (0-100) ────────────────────────
-    fit = 0.0
-    fit_breakdown = {}
-
-    # Job title match
-    title_lower = (req.job_title or "").lower()
-    if any(t.lower() in title_lower for t in req.icp_titles):
-        fit += 30
-        fit_breakdown["title_match"] = 30
-    elif any(kw in title_lower for kw in ["vp", "director", "head of", "chief"]):
-        fit += 20
-        fit_breakdown["title_seniority"] = 20
-    elif any(kw in title_lower for kw in ["manager", "lead", "senior"]):
-        fit += 12
-        fit_breakdown["title_partial"] = 12
-    else:
-        fit_breakdown["title"] = 0
-
-    # Company size
-    if req.company_size and req.icp_company_sizes:
-        fit += _score_company_size(req.company_size, req.icp_company_sizes) * 25
-        fit_breakdown["company_size"] = _score_company_size(req.company_size, req.icp_company_sizes) * 25
-
-    # Email domain (not personal)
-    if req.email and not _is_personal_email(req.email):
-        fit += 15
-        fit_breakdown["business_email"] = 15
-
-    fit = min(100.0, fit)
-
-    # ── INTENT SCORE (0-100) ─────────────────────
-    intent = 0.0
-    intent_breakdown = {}
-
-    page_type_scores = {
-        "pricing":      30,
-        "comparison":   25,
-        "landing_page": 20,
-        "case_study":   15,
-        "blog":         8,
-    }
-    intent += page_type_scores.get(req.source_page_type or "blog", 5)
-    intent_breakdown["page_type"] = page_type_scores.get(req.source_page_type or "", 5)
-
-    keyword_intent = _score_keyword_intent(req.source_keyword or "")
-    intent += keyword_intent * 30
-    intent_breakdown["keyword_intent"] = keyword_intent * 30
-
-    if req.visited_pricing:
-        intent += 25
-        intent_breakdown["pricing_visit"] = 25
-
-    if req.calendar_visits > 0:
-        intent += 15
-        intent_breakdown["calendar_visit"] = 15
-
-    intent = min(100.0, intent)
-
-    # ── ENGAGEMENT SCORE (0-100) ─────────────────
-    engagement = 0.0
-    engagement_breakdown = {}
-
-    engagement += min(30, req.pages_visited * 8)
-    engagement_breakdown["pages_visited"] = min(30, req.pages_visited * 8)
-
-    engagement += min(20, req.email_opens * 3)
-    engagement_breakdown["email_opens"] = min(20, req.email_opens * 3)
-
-    engagement += min(20, req.email_clicks * 5)
-    engagement_breakdown["email_clicks"] = min(20, req.email_clicks * 5)
-
-    engagement += min(15, req.content_consumed * 5)
-    engagement_breakdown["content_consumed"] = min(15, req.content_consumed * 5)
-
-    engagement = min(100.0, engagement)
-
-    # ── VELOCITY SCORE (0-100) ─────────────────
-    # High engagement in short time = high intent
-    velocity = 0.0
-    if req.days_since_signup > 0:
-        actions_per_day = (req.pages_visited + req.email_opens + req.email_clicks) / req.days_since_signup
-        velocity = min(100.0, actions_per_day * 20)
-    elif req.pages_visited > 0:
-        velocity = 80  # Same-day activity = very high intent
-
-    # ── COMPOSITE (weighted) ─────────────────────
-    composite = (
-        fit        * 0.25 +
-        intent     * 0.35 +
-        engagement * 0.25 +
-        velocity   * 0.15
-    )
-
-    # ── LTV ESTIMATE ─────────────────────────────
-    ltv_estimate = _estimate_ltv(composite, fit, req.company_size)
-
-    # ── ROUTING DECISION ─────────────────────────
-    stage, routing, actions = _route_lead(composite, intent, fit)
-
-    return ScoringResult(
-        composite_score=round(composite, 1),
-        intent_score=round(intent, 1),
-        fit_score=round(fit, 1),
-        engagement_score=round(engagement, 1),
-        velocity_score=round(velocity, 1),
-        ltv_estimate=round(ltv_estimate, 2),
-        stage=stage,
-        routing=routing,
-        score_breakdown={
-            "fit":        fit_breakdown,
-            "intent":     intent_breakdown,
-            "engagement": engagement_breakdown,
-            "velocity":   {"score": round(velocity, 1)},
-        },
-        recommended_actions=actions,
-    )
+    leads: List[LeadInput] = Field(..., min_length=1)
 
 
-@router.post("/batch")
-async def batch_score(leads: List[LeadScoringRequest]):
-    """Score multiple leads in one call — for bulk re-scoring."""
-    results = []
-    for lead in leads[:100]:  # cap at 100
-        result = await enhance_score(lead)
-        results.append({"email": lead.email, **result.dict()})
-    return {"scored": len(results), "results": results}
+class ScoringResponse(BaseModel):
+    """Batch scoring response."""
+
+    scored_count:  int
+    leads:         List[EnhancedLead]
 
 
 # ─────────────────────────────────────────────
-# Helpers
+# ICP reference data
 # ─────────────────────────────────────────────
 
-PERSONAL_DOMAINS = {
-    "gmail.com", "yahoo.com", "hotmail.com", "outlook.com",
-    "icloud.com", "me.com", "aol.com", "protonmail.com",
+# C-suite / VP level titles that earn a +5% bonus
+CSUITE_KEYWORDS = {
+    "ceo", "cto", "coo", "cfo", "cmo", "cpo", "chief",
+    "vp ", "vp,", "vice president",
 }
 
-def _is_personal_email(email: str) -> bool:
-    domain = email.split("@")[-1].lower()
-    return domain in PERSONAL_DOMAINS
+# Industries with historically high conversion rates
+HIGH_VALUE_INDUSTRIES = {
+    "saas", "software", "technology", "fintech", "healthcare",
+    "marketing", "e-commerce", "financial services",
+}
 
 
-def _score_company_size(size: int, icp_ranges: List[str]) -> float:
-    """Returns 0.0–1.0 match score for company size."""
-    for r in icp_ranges:
-        parts = r.split("-")
-        if len(parts) == 2:
-            try:
-                lo, hi = int(parts[0]), int(parts[1])
-                if lo <= size <= hi:
-                    return 1.0
-            except ValueError:
-                pass
-    return 0.3  # not in ICP size but not zero
+# ─────────────────────────────────────────────
+# Endpoint
+# ─────────────────────────────────────────────
+
+@router.post("/enhance", response_model=ScoringResponse)
+async def enhance_scores(req: ScoringRequest):
+    """
+    Compute an enhanced composite score for each lead in the batch.
+
+    Scoring formula:
+        base = intent_score * 0.40 + fit_score * 0.35 + engagement_score * 0.25
+
+    Bonus multipliers applied multiplicatively on top of the base:
+        +10%  if company_size > 500  (enterprise account)
+        +5%   if job_title contains a C-suite or VP keyword
+        +5%   if content_downloads > 3
+
+    Final composite is clamped to [0, 100].
+    """
+    enhanced: List[EnhancedLead] = []
+
+    for lead in req.leads:
+        result = _score_lead(lead)
+        enhanced.append(result)
+
+    return ScoringResponse(scored_count=len(enhanced), leads=enhanced)
 
 
-BOFU_SIGNALS = ["alternative", "pricing", "review", "comparison", "vs ", "best "]
-MOFU_SIGNALS = ["how to", "software", "platform", "tool", "solution"]
+# ─────────────────────────────────────────────
+# Core scoring logic
+# ─────────────────────────────────────────────
 
-def _score_keyword_intent(keyword: str) -> float:
-    kw = keyword.lower()
-    for sig in BOFU_SIGNALS:
-        if sig in kw:
-            return 1.0
-    for sig in MOFU_SIGNALS:
-        if sig in kw:
-            return 0.6
-    return 0.2  # TOFU
+def _score_lead(lead: LeadInput) -> EnhancedLead:
+    """Compute the full enhanced score for a single lead."""
+
+    # ── BASE COMPOSITE ──────────────────────────
+    base = (
+        lead.intent_score      * 0.40
+        + lead.fit_score       * 0.35
+        + lead.engagement_score * 0.25
+    )
+
+    # ── BONUS MULTIPLIERS ───────────────────────
+    multiplier = 1.0
+
+    is_enterprise = (lead.company_size or 0) > 500
+    if is_enterprise:
+        multiplier += 0.10
+
+    is_csuite = _is_csuite(lead.job_title)
+    if is_csuite:
+        multiplier += 0.05
+
+    has_content_downloads = (lead.content_downloads or 0) > 3
+    if has_content_downloads:
+        multiplier += 0.05
+
+    composite = min(100.0, base * multiplier)
+
+    # ── SEGMENT ─────────────────────────────────
+    segment = _classify_segment(composite)
+
+    # ── ICP FIT PERCENTAGE ──────────────────────
+    icp_fit_pct = _calculate_icp_fit(
+        company_size=lead.company_size,
+        job_title=lead.job_title,
+        industry=lead.industry,
+    )
+
+    # ── VELOCITY SCORE ───────────────────────────
+    velocity_score = _calculate_velocity(lead)
+
+    # ── TOP SIGNALS ─────────────────────────────
+    top_signals = _extract_top_signals(
+        lead=lead,
+        is_enterprise=is_enterprise,
+        is_csuite=is_csuite,
+        has_content_downloads=has_content_downloads,
+        composite=composite,
+        velocity_score=velocity_score,
+    )
+
+    # ── RECOMMENDED ACTION ──────────────────────
+    recommended_action = _recommend_action(composite, segment)
+
+    return EnhancedLead(
+        id=lead.id,
+        composite_score=round(composite, 2),
+        segment=segment,
+        top_signals=top_signals,
+        recommended_action=recommended_action,
+        icp_fit_pct=round(icp_fit_pct, 2),
+        velocity_score=round(velocity_score, 2),
+    )
 
 
-def _estimate_ltv(composite: float, fit: float, company_size: Optional[int]) -> float:
-    """Simple LTV estimate based on score + company size."""
-    base_ltv = 2400  # 12 months × $200 avg MRR
-    score_multiplier = 0.5 + (composite / 100)
-    size_multiplier  = 1.0
-    if company_size:
-        if company_size >= 500:   size_multiplier = 3.0
-        elif company_size >= 200: size_multiplier = 2.0
-        elif company_size >= 50:  size_multiplier = 1.5
-    return base_ltv * score_multiplier * size_multiplier
-
-
-def _route_lead(composite: float, intent: float, fit: float):
-    """Determine stage, routing, and actions."""
-    if composite >= 70:
-        return (
-            "sql",
-            "immediate_personal",
-            [
-                "Send personalized email within 5 minutes",
-                "Assign to AE for follow-up call",
-                "Create HubSpot deal",
-                "Add to high-intent nurture sequence",
-            ],
-        )
-    elif composite >= 50:
-        return (
-            "mql",
-            "automated_nurture",
-            [
-                "Enroll in MQL nurture sequence",
-                "Send value-add content based on source page",
-                "Score again in 3 days",
-            ],
-        )
-    elif composite >= 30:
-        return (
-            "prospect",
-            "light_nurture",
-            [
-                "Add to low-frequency email list",
-                "Retarget with relevant content",
-                "Monitor for intent spikes",
-            ],
-        )
+def _classify_segment(composite: float) -> str:
+    """Map composite score to a named segment tier."""
+    if composite > 80:
+        return "hot"
+    elif composite >= 60:
+        return "warm"
+    elif composite >= 40:
+        return "cool"
     else:
-        return (
-            "prospect",
-            "monitor",
-            ["Watch for engagement signals", "No active outreach yet"],
-        )
+        return "cold"
+
+
+def _is_csuite(job_title: Optional[str]) -> bool:
+    """Return True if the job title signals C-suite or VP seniority."""
+    if not job_title:
+        return False
+    lower = job_title.lower()
+    return any(kw in lower for kw in CSUITE_KEYWORDS)
+
+
+def _calculate_icp_fit(
+    company_size: Optional[int],
+    job_title: Optional[str],
+    industry: Optional[str],
+) -> float:
+    """
+    Estimate how closely the lead matches the Ideal Customer Profile.
+
+    Scoring components (each 0–100, averaged):
+      - Company size:  100 if 50-500, 80 if >500, 50 if 10-49, 20 otherwise
+      - Job title:     100 if C-suite/VP, 80 if Director/Head, 60 if Manager, 20 otherwise
+      - Industry:      100 if in high-value set, 50 otherwise
+
+    Returns a percentage (0.0–100.0).
+    """
+    scores: List[float] = []
+
+    # Company size fit
+    if company_size is not None:
+        if 50 <= company_size <= 500:
+            scores.append(100.0)
+        elif company_size > 500:
+            scores.append(80.0)
+        elif 10 <= company_size < 50:
+            scores.append(50.0)
+        else:
+            scores.append(20.0)
+
+    # Title fit
+    if job_title:
+        lower = job_title.lower()
+        if _is_csuite(job_title):
+            scores.append(100.0)
+        elif any(kw in lower for kw in ("director", "head of", "head,")):
+            scores.append(80.0)
+        elif any(kw in lower for kw in ("manager", "lead", "senior")):
+            scores.append(60.0)
+        else:
+            scores.append(20.0)
+
+    # Industry fit
+    if industry:
+        lower = industry.lower()
+        if any(ind in lower for ind in HIGH_VALUE_INDUSTRIES):
+            scores.append(100.0)
+        else:
+            scores.append(50.0)
+
+    return (sum(scores) / len(scores)) if scores else 50.0
+
+
+def _calculate_velocity(lead: LeadInput) -> float:
+    """
+    Velocity captures how quickly a lead is engaging.
+
+    Formula:
+        total_actions = pages_visited + email_opens + content_downloads
+        velocity      = (total_actions / max(days_since_first_touch, 1)) * 10
+
+    Clamped to [0, 100].  A lead with heavy activity on day 0 scores 100.
+    """
+    total_actions = (
+        (lead.pages_visited or 0)
+        + (lead.email_opens or 0)
+        + (lead.content_downloads or 0)
+    )
+    days = max(lead.days_since_first_touch, 1)
+    velocity = min(100.0, (total_actions / days) * 10.0)
+    return velocity
+
+
+def _extract_top_signals(
+    lead: LeadInput,
+    is_enterprise: bool,
+    is_csuite: bool,
+    has_content_downloads: bool,
+    composite: float,
+    velocity_score: float,
+) -> List[str]:
+    """
+    Return the top 3 positive signals driving this lead's score.
+
+    Signals are ranked by their estimated contribution to the composite.
+    """
+    candidates: List[tuple] = []
+
+    # Weighted base contributions
+    candidates.append((lead.intent_score * 0.40, f"High intent score ({lead.intent_score:.0f}/100)"))
+    candidates.append((lead.fit_score * 0.35,    f"Strong ICP fit score ({lead.fit_score:.0f}/100)"))
+    candidates.append((lead.engagement_score * 0.25, f"Active engagement score ({lead.engagement_score:.0f}/100)"))
+
+    # Bonus signals
+    if is_enterprise:
+        candidates.append((10.0, f"Enterprise account (company size: {lead.company_size})"))
+    if is_csuite:
+        candidates.append((7.0, f"C-suite / VP decision maker ({lead.job_title})"))
+    if has_content_downloads:
+        candidates.append((6.0, f"Heavy content consumption ({lead.content_downloads} downloads)"))
+    if velocity_score >= 60:
+        candidates.append((velocity_score * 0.1, f"High engagement velocity ({velocity_score:.0f}/100)"))
+    if (lead.pages_visited or 0) >= 5:
+        candidates.append((5.0, f"Multiple page visits ({lead.pages_visited} pages)"))
+    if (lead.time_on_site_min or 0) >= 10:
+        candidates.append((4.0, f"Long session time ({lead.time_on_site_min:.0f} min on site)"))
+
+    # Sort by contribution descending, return top 3 descriptions
+    candidates.sort(key=lambda x: x[0], reverse=True)
+    return [desc for _, desc in candidates[:3]]
+
+
+def _recommend_action(composite: float, segment: str) -> str:
+    """
+    Map composite score / segment to a recommended sales action.
+
+    - hot  (>80)  : immediate_outreach
+    - warm (60-80): nurture_sequence
+    - cool (40-60): educational_content
+    - cold (<40)  : disqualify
+    """
+    mapping = {
+        "hot":  "immediate_outreach",
+        "warm": "nurture_sequence",
+        "cool": "educational_content",
+        "cold": "disqualify",
+    }
+    return mapping.get(segment, "educational_content")

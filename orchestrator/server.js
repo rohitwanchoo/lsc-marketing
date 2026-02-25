@@ -35,8 +35,48 @@ function parseCookies(req) {
   }).filter(([k]) => k));
 }
 
+// ─────────────────────────────────────────────
+// Input validation helpers
+// ─────────────────────────────────────────────
+
+/**
+ * Validate email format using RFC 5322-lite regex.
+ * @param {string} email
+ * @returns {boolean}
+ */
+function validateEmail(email) {
+  if (typeof email !== 'string') return false;
+  const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  return re.test(email.trim());
+}
+
+/**
+ * Trim whitespace and strip HTML tags from a string field.
+ * Returns undefined if the input is not a string.
+ * @param {unknown} str
+ * @returns {string|undefined}
+ */
+function sanitizeString(str) {
+  if (str === undefined || str === null) return undefined;
+  if (typeof str !== 'string') return undefined;
+  return str.trim().replace(/<[^>]*>/g, '');
+}
+
 const app = express();
 app.use(express.json({ limit: '2mb' }));
+
+// ─────────────────────────────────────────────
+// Security headers (applied before all routes)
+// ─────────────────────────────────────────────
+app.use((req, res, next) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader('X-XSS-Protection', '1; mode=block');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  res.removeHeader('X-Powered-By');
+  next();
+});
+
 app.use(requestLogger);
 app.use(cors);
 app.use(guardrails);
@@ -46,8 +86,52 @@ app.use(guardrails);
 // ─────────────────────────────────────────────
 
 // Public routes (no rate limit)
-app.get('/health', (req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString(), version: '1.0.0' });
+app.get('/health', async (req, res) => {
+  const services = {
+    database:   'ok',
+    redis:      'ok',
+    python_api: 'ok',
+  };
+
+  // ── Database check ────────────────────────────────
+  try {
+    await queryOne('SELECT 1 AS ping');
+  } catch (err) {
+    services.database = `error: ${err.message}`;
+    logger.warn('Health check: database unreachable', { err: err.message });
+  }
+
+  // ── Redis check ───────────────────────────────────
+  try {
+    await queues.connection.ping();
+  } catch (err) {
+    services.redis = `error: ${err.message}`;
+    logger.warn('Health check: redis unreachable', { err: err.message });
+  }
+
+  // ── Python Analytics API check ────────────────────
+  try {
+    const resp = await fetch(`${config.pythonApiUrl}/health`, {
+      signal: AbortSignal.timeout(3000),
+    });
+    if (!resp.ok) services.python_api = `error: HTTP ${resp.status}`;
+  } catch (err) {
+    services.python_api = `error: ${err.message}`;
+  }
+
+  const allOk      = Object.values(services).every(v => v === 'ok');
+  const criticalOk = services.database === 'ok' && services.redis === 'ok';
+
+  const overallStatus = allOk ? 'ok' : criticalOk ? 'degraded' : 'down';
+  const httpStatus    = allOk ? 200 : criticalOk ? 207 : 503;
+
+  res.status(httpStatus).json({
+    status:    overallStatus,
+    version:   '1.0.0',
+    uptime:    Math.floor(process.uptime()),
+    services,
+    timestamp: new Date().toISOString(),
+  });
 });
 
 // Apply rate limiting to all API routes
@@ -72,9 +156,30 @@ app.get('/status', async (req, res) => {
 
 app.post('/webhook/lead', async (req, res) => {
   try {
-    const { email, full_name, company, job_title, source_page, source_keyword, utm } = req.body;
+    const body = req.body || {};
 
-    if (!email) return res.status(400).json({ error: 'email required' });
+    // ── Input validation ──────────────────────────────────────
+    const email = sanitizeString(body.email);
+    if (!email) {
+      return res.status(400).json({ error: 'email is required' });
+    }
+    if (!validateEmail(email)) {
+      return res.status(400).json({ error: 'email must be a valid email address' });
+    }
+
+    const full_name  = sanitizeString(body.full_name);
+    const company    = sanitizeString(body.company);
+    const job_title  = sanitizeString(body.job_title);
+    const phone      = sanitizeString(body.phone);
+
+    if (full_name  && full_name.length  > 200) return res.status(400).json({ error: 'full_name must not exceed 200 characters' });
+    if (company    && company.length    > 200) return res.status(400).json({ error: 'company must not exceed 200 characters' });
+    if (job_title  && job_title.length  > 200) return res.status(400).json({ error: 'job_title must not exceed 200 characters' });
+    if (phone      && phone.length      >  50) return res.status(400).json({ error: 'phone must not exceed 50 characters' });
+
+    const source_page    = sanitizeString(body.source_page);
+    const source_keyword = sanitizeString(body.source_keyword);
+    const utm            = body.utm && typeof body.utm === 'object' ? body.utm : {};
 
     const leadId = uuidv4();
 
@@ -209,7 +314,10 @@ app.get('/api/keywords', async (req, res) => {
       k.serp_position, k.priority_score, k.product_id,
       p.name AS product_name, p.website_url AS product_website,
       COALESCE(agg.total_leads, 0) AS total_leads,
-      COALESCE(agg.total_revenue, 0) AS total_revenue
+      COALESCE(agg.total_revenue, 0) AS total_revenue,
+      CASE WHEN COALESCE(agg.total_leads, 0) > 0
+           THEN COALESCE(agg.total_revenue, 0) / agg.total_leads
+           ELSE 0 END AS revenue_per_lead
     FROM keywords k
     LEFT JOIN products p ON p.id = k.product_id
     LEFT JOIN (
@@ -1413,11 +1521,30 @@ app.get('/api/search', async (req, res) => {
 app.get('/api/export/:type', async (req, res) => {
   try {
     const { type } = req.params;
+    const { format = 'csv', stage, dateFrom, dateTo } = req.query;
     let rows = [];
-    let filename = `${type}.csv`;
+    let filename = `${type}.${format === 'json' ? 'json' : 'csv'}`;
 
     if (type === 'leads') {
-      rows = await queryAll(`SELECT id, email, full_name, company, job_title, stage, composite_score, first_touch_channel, created_at FROM leads ORDER BY created_at DESC`);
+      const conditions = [];
+      const params = [];
+      if (stage) { params.push(stage); conditions.push(`stage = $${params.length}`); }
+      if (dateFrom) { params.push(dateFrom); conditions.push(`created_at >= $${params.length}`); }
+      if (dateTo) { params.push(dateTo); conditions.push(`created_at <= $${params.length}`); }
+      const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
+      rows = await queryAll(
+        `SELECT id, email, full_name, company, job_title, stage, composite_score,
+                intent_score, fit_score, engagement_score,
+                first_touch_channel, utm_source, utm_medium, utm_campaign,
+                created_at, converted_at
+         FROM leads ${where} ORDER BY created_at DESC`,
+        params
+      );
+      if (format === 'json') {
+        res.setHeader('Content-Type', 'application/json');
+        res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+        return res.json(rows);
+      }
     } else if (type === 'content') {
       rows = await queryAll(`SELECT id, title, content_type, status, approval_status, pageviews, leads_generated, revenue_attr, published_at FROM content_assets ORDER BY created_at DESC`);
     } else if (type === 'keywords') {
@@ -1445,10 +1572,30 @@ app.get('/api/export/:type', async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// ─────────────────────────────────────────────
+// NOTIFICATIONS CRUD
+// ─────────────────────────────────────────────
+
 app.get('/api/notifications', async (req, res) => {
   try {
-    const rows = await queryAll(`SELECT * FROM notifications ORDER BY created_at DESC LIMIT 50`);
+    const { unread, limit = 50, type } = req.query;
+    const conditions = [];
+    const params = [];
+    if (unread === 'true') { conditions.push(`read_at IS NULL`); }
+    if (type) { params.push(type); conditions.push(`type = $${params.length}`); }
+    const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
+    const rows = await queryAll(
+      `SELECT * FROM notifications ${where} ORDER BY created_at DESC LIMIT ${parseInt(limit)}`,
+      params
+    );
     res.json(rows);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.patch('/api/notifications/read-all', async (req, res) => {
+  try {
+    await query(`UPDATE notifications SET read_at = NOW() WHERE read_at IS NULL`);
+    res.json({ ok: true });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
@@ -1459,9 +1606,81 @@ app.patch('/api/notifications/:id/read', async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-app.patch('/api/notifications/read-all', async (req, res) => {
+app.delete('/api/notifications/:id', async (req, res) => {
   try {
-    await query(`UPDATE notifications SET read_at = NOW() WHERE read_at IS NULL`);
+    await query(`DELETE FROM notifications WHERE id = $1`, [req.params.id]);
+    res.json({ ok: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// ─────────────────────────────────────────────
+// AUDIT LOGS
+// ─────────────────────────────────────────────
+
+app.get('/api/audit-logs', async (req, res) => {
+  try {
+    const { limit = 50, offset = 0, userId, action } = req.query;
+    const conditions = [];
+    const params = [];
+    if (userId) { params.push(userId); conditions.push(`user_id = $${params.length}`); }
+    if (action) { params.push(`%${action}%`); conditions.push(`action ILIKE $${params.length}`); }
+    const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
+    params.push(parseInt(limit), parseInt(offset));
+    const rows = await queryAll(
+      `SELECT * FROM audit_logs ${where} ORDER BY created_at DESC LIMIT $${params.length - 1} OFFSET $${params.length}`,
+      params
+    );
+    res.json(rows);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// ─────────────────────────────────────────────
+// INTEGRATIONS CONFIG CRUD
+// ─────────────────────────────────────────────
+
+app.get('/api/integrations', async (req, res) => {
+  try {
+    const rows = await queryAll(
+      `SELECT id, integration_name, config_json, enabled, last_sync_at, last_error, updated_at
+       FROM integrations_config ORDER BY integration_name`
+    );
+    // Mask secrets inside config_json
+    const masked = rows.map(r => {
+      let cfg = r.config_json || {};
+      if (typeof cfg === 'string') { try { cfg = JSON.parse(cfg); } catch { cfg = {}; } }
+      // Redact any key that looks like a secret
+      const safeCfg = Object.fromEntries(
+        Object.entries(cfg).map(([k, v]) => {
+          const lower = k.toLowerCase();
+          if (lower.includes('secret') || lower.includes('token') || lower.includes('api_key') || lower.includes('password')) {
+            return [k, v ? '****' : null];
+          }
+          return [k, v];
+        })
+      );
+      return { ...r, config_json: safeCfg };
+    });
+    res.json(masked);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.patch('/api/integrations/:name', async (req, res) => {
+  try {
+    const { name } = req.params;
+    const { enabled, webhook_url, config } = req.body;
+    // Build config_json update from webhook_url or explicit config
+    const configUpdate = config || (webhook_url ? { webhook_url } : null);
+    await query(
+      `INSERT INTO integrations_config (integration_name, config_json, enabled, updated_at)
+       VALUES ($1, $2::jsonb, $3, NOW())
+       ON CONFLICT (integration_name) DO UPDATE
+         SET enabled     = COALESCE($3, integrations_config.enabled),
+             config_json = CASE WHEN $2::jsonb IS NOT NULL
+                                THEN integrations_config.config_json || $2::jsonb
+                                ELSE integrations_config.config_json END,
+             updated_at  = NOW()`,
+      [name, configUpdate ? JSON.stringify(configUpdate) : null, enabled ?? null]
+    );
     res.json({ ok: true });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -1478,6 +1697,52 @@ app.get('/api/onboarding/status', async (req, res) => {
     const has_leads    = parseInt(leadCount?.cnt || 0) > 0;
     const complete     = integrations_configured && has_content && has_leads;
     res.json({ complete, integrations_configured, has_content, has_leads });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// ── Lead PATCH (stage, owner, score updates from dashboard) ───────────────────
+app.patch('/api/leads/:id', async (req, res) => {
+  try {
+    const allowed = ['stage', 'owner_email', 'intent_score', 'fit_score', 'engagement_score'];
+    const updates = [];
+    const params  = [];
+    for (const field of allowed) {
+      if (req.body[field] !== undefined) {
+        params.push(req.body[field]);
+        updates.push(`${field} = $${params.length}`);
+      }
+    }
+    if (updates.length === 0) return res.status(400).json({ error: 'No valid fields to update' });
+    params.push(req.params.id);
+    const row = await queryOne(
+      `UPDATE leads SET ${updates.join(', ')}, updated_at = NOW() WHERE id = $${params.length} RETURNING id`,
+      params
+    );
+    if (!row) return res.status(404).json({ error: 'Lead not found' });
+    res.json({ ok: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// ── Products PATCH ─────────────────────────────────────────────────────────────
+app.patch('/api/products/:id', async (req, res) => {
+  try {
+    const allowed = ['name', 'tagline', 'description', 'icp', 'value_proposition', 'brand_tone', 'pricing_model', 'target_market'];
+    const updates = [];
+    const params  = [];
+    for (const field of allowed) {
+      if (req.body[field] !== undefined) {
+        params.push(req.body[field]);
+        updates.push(`${field} = $${params.length}`);
+      }
+    }
+    if (updates.length === 0) return res.status(400).json({ error: 'No valid fields to update' });
+    params.push(req.params.id);
+    const row = await queryOne(
+      `UPDATE products SET ${updates.join(', ')} WHERE id = $${params.length} RETURNING id`,
+      params
+    );
+    if (!row) return res.status(404).json({ error: 'Product not found' });
+    res.json({ ok: true });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 

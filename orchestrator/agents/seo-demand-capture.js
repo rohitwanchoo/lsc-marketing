@@ -144,16 +144,38 @@ Return ONLY valid JSON (no markdown, no commentary):
 
     const research = parseJSON(content);
 
-    // Persist keywords to database (linked to product if provided)
+    // Persist keywords to database (linked to product if provided).
+    // Use ON CONFLICT DO UPDATE so re-running discovery refreshes scores without errors.
+    // When product_id is null we fall back to the simple (keyword) unique constraint.
     let inserted = 0;
     for (const kw of research.keywords || []) {
       if (existingSet.has(kw.keyword)) continue;
-      await query(
-        `INSERT INTO keywords (keyword, intent, search_volume, difficulty, cpc_usd, priority_score, product_id)
-         VALUES ($1, $2, $3, $4, $5, $6, $7)
-         ON CONFLICT (keyword) DO UPDATE SET priority_score = EXCLUDED.priority_score, product_id = COALESCE(keywords.product_id, EXCLUDED.product_id)`,
-        [kw.keyword, kw.intent, kw.estimated_volume, kw.difficulty, kw.estimated_cpc, kw.priority_score, productId]
-      );
+      try {
+        if (productId) {
+          await query(
+            `INSERT INTO keywords (keyword, intent, search_volume, difficulty, cpc_usd, priority_score, product_id)
+             VALUES ($1, $2, $3, $4, $5, $6, $7)
+             ON CONFLICT (keyword, product_id) DO UPDATE
+               SET priority_score = EXCLUDED.priority_score,
+                   intent = EXCLUDED.intent,
+                   search_volume = EXCLUDED.search_volume`,
+            [kw.keyword, kw.intent, kw.estimated_volume, kw.difficulty, kw.estimated_cpc, kw.priority_score, productId]
+          );
+        } else {
+          await query(
+            `INSERT INTO keywords (keyword, intent, search_volume, difficulty, cpc_usd, priority_score)
+             VALUES ($1, $2, $3, $4, $5, $6)
+             ON CONFLICT (keyword) DO UPDATE
+               SET priority_score = EXCLUDED.priority_score,
+                   intent = EXCLUDED.intent,
+                   search_volume = EXCLUDED.search_volume`,
+            [kw.keyword, kw.intent, kw.estimated_volume, kw.difficulty, kw.estimated_cpc, kw.priority_score]
+          );
+        }
+      } catch (err) {
+        log.warn('Keyword insert failed — skipping', { keyword: kw.keyword, err: err.message });
+        continue;
+      }
       inserted++;
     }
 
@@ -464,9 +486,17 @@ Return JSON:
         if (domain) competitorDomains.add(domain.replace(/^https?:\/\//, '').replace(/\/.*/, ''));
       }
     }
-    // Always include any known competitors from business context
+    // Fall back to config.business.competitors when no product-level competitors are defined.
+    // Operators set COMPETITORS=hubspot.com,activecampaign.com in .env — never hardcode.
     if (!competitorDomains.size) {
-      ['hubspot.com', 'activecampaign.com', 'marketo.com'].forEach(d => competitorDomains.add(d));
+      const configCompetitors = Array.isArray(config.business.competitors)
+        ? config.business.competitors
+        : [];
+      if (configCompetitors.length > 0) {
+        configCompetitors.forEach(d => competitorDomains.add(d));
+      } else {
+        log.warn('No competitor domains configured — skipping competitor monitoring. Set COMPETITORS in .env.');
+      }
     }
 
     // Our tracked keyword set

@@ -14,11 +14,13 @@ export function getPool() {
       database: config.db.name,
       user:     config.db.user,
       password: config.db.password,
-      max:      20,
+      max:      30,
       idleTimeoutMillis: 30000,
-      connectionTimeoutMillis: 2000,
+      connectionTimeoutMillis: 5000,
     });
-    pool.on('error', (err) => logger.error('PG pool error', { err: err.message }));
+    pool.on('error', (err) => logger.error('PG pool error', { err: err.message, stack: err.stack }));
+    pool.on('connect', () => logger.debug('PG pool: new client connected'));
+    pool.on('remove', () => logger.debug('PG pool: client removed'));
   }
   return pool;
 }
@@ -47,6 +49,26 @@ export async function queryAll(sql, params = []) {
 }
 
 export async function transaction(fn) {
+  const pool = getPool();
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const result = await fn(client);
+    await client.query('COMMIT');
+    return result;
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
+}
+
+/**
+ * Alias for transaction() — preferred name used by agents for clarity.
+ * Runs `fn(client)` inside a BEGIN/COMMIT block, rolling back on error.
+ */
+export async function withTransaction(fn) {
   const pool = getPool();
   const client = await pool.connect();
   try {

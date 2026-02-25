@@ -7,7 +7,7 @@
  */
 
 import { callAI, parseJSON } from '../utils/ai.js';
-import { queryAll, queryOne, query } from '../utils/db.js';
+import { queryAll, queryOne, query, withTransaction } from '../utils/db.js';
 import { agentLogger } from '../utils/logger.js';
 import { config } from '../config.js';
 import { v4 as uuidv4 } from 'uuid';
@@ -214,26 +214,29 @@ Return JSON:
     // U-shaped attribution: 40% first touch, 40% last touch, 20% distributed
     const attribution = this._calculateUShapedAttribution(touchpoints, event.amount_usd);
 
-    // Update keyword and content attribution in DB
-    for (const touch of attribution) {
-      if (touch.keyword_id) {
-        await query(
-          `UPDATE keywords SET revenue_attr = revenue_attr + $1 WHERE id = $2`,
-          [touch.attributed_amount, touch.keyword_id]
-        );
+    // Update keyword and content attribution in DB — wrap in a transaction so
+    // all attribution updates are atomic (no partial writes if one fails).
+    await withTransaction(async (client) => {
+      for (const touch of attribution) {
+        if (touch.keyword_id) {
+          await client.query(
+            `UPDATE keywords SET revenue_attr = revenue_attr + $1 WHERE id = $2`,
+            [touch.attributed_amount, touch.keyword_id]
+          );
+        }
+        if (touch.content_id) {
+          await client.query(
+            `UPDATE content_assets SET revenue_attr = revenue_attr + $1 WHERE id = $2`,
+            [touch.attributed_amount, touch.content_id]
+          );
+        }
       }
-      if (touch.content_id) {
-        await query(
-          `UPDATE content_assets SET revenue_attr = revenue_attr + $1 WHERE id = $2`,
-          [touch.attributed_amount, touch.content_id]
-        );
-      }
-    }
 
-    await query(
-      `UPDATE revenue_events SET attribution = $1 WHERE id = $2`,
-      [JSON.stringify(attribution), revenueEventId]
-    );
+      await client.query(
+        `UPDATE revenue_events SET attribution = $1 WHERE id = $2`,
+        [JSON.stringify(attribution), revenueEventId]
+      );
+    });
 
     return attribution;
   }

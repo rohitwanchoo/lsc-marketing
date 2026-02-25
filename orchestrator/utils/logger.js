@@ -4,6 +4,45 @@ const { combine, timestamp, json, colorize, simple, errors } = winston.format;
 
 const isDev = process.env.NODE_ENV !== 'production';
 
+// ─────────────────────────────────────────────
+// Log sanitization — strip sensitive fields before they reach log storage
+// ─────────────────────────────────────────────
+
+const REDACTED_KEYS = new Set([
+  'password',
+  'password_hash',
+  'api_key',
+  'secret',
+  'token',
+  'authorization',
+  'credit_card',
+  'ssn',
+  'access_token',
+  'refresh_token',
+]);
+
+/**
+ * Recursively redact sensitive fields from an object before logging.
+ * Returns a new object; the original is not mutated.
+ *
+ * @param {unknown} obj - Value to sanitize
+ * @returns {unknown} Sanitized copy
+ */
+export function sanitize(obj) {
+  if (obj === null || typeof obj !== 'object') return obj;
+  if (Array.isArray(obj)) return obj.map(sanitize);
+
+  const out = {};
+  for (const [key, value] of Object.entries(obj)) {
+    if (REDACTED_KEYS.has(key.toLowerCase())) {
+      out[key] = '[REDACTED]';
+    } else {
+      out[key] = sanitize(value);
+    }
+  }
+  return out;
+}
+
 export const logger = winston.createLogger({
   level: process.env.LOG_LEVEL || 'info',
   format: combine(

@@ -4,6 +4,9 @@ import type { NextRequest } from 'next/server';
 
 const PUBLIC_PATHS = ['/login', '/api/auth'];
 
+// Methods that mutate state and therefore require CSRF protection
+const STATE_CHANGING_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
+
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
@@ -12,12 +15,34 @@ export async function middleware(req: NextRequest) {
     return NextResponse.next();
   }
 
-  const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET });
-
   // Build base URL from the public-facing host header (works correctly behind Apache proxy)
   const host = req.headers.get('x-forwarded-host') || req.headers.get('host') || 'localhost';
   const proto = req.headers.get('x-forwarded-proto') || 'https';
   const baseUrl = `${proto}://${host}`;
+
+  // ── CSRF protection for state-changing API requests ───────────────────────
+  // For mutating requests to /api/* routes, verify that the Origin or Referer
+  // header matches this server's own origin.  Browsers always send one of these
+  // for same-site fetches; a cross-origin attacker cannot set them.
+  // NextAuth's own endpoints (/api/auth/*) are already exempted above.
+  if (STATE_CHANGING_METHODS.has(req.method) && pathname.startsWith('/api/')) {
+    const origin   = req.headers.get('origin');
+    const referer  = req.headers.get('referer');
+    const expected = `${proto}://${host}`;
+
+    const sourceOk =
+      (origin  && origin.startsWith(expected)) ||
+      (referer && referer.startsWith(expected));
+
+    if (!sourceOk) {
+      return new NextResponse(
+        JSON.stringify({ error: 'CSRF check failed: origin mismatch' }),
+        { status: 403, headers: { 'Content-Type': 'application/json' } }
+      );
+    }
+  }
+
+  const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET });
 
   // Redirect unauthenticated users to login
   if (!token) {

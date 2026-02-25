@@ -1,284 +1,406 @@
 """
 Content Intelligence Router
 
-Analyzes content performance data to surface:
-- Conversion rate regression (which content elements predict conversion)
-- Content decay detection (when does performance plateau/drop)
-- Topic cluster strength scoring
-- Internal link optimization recommendations
+Two endpoints:
+
+1. POST /content/regression
+   Computes Pearson correlations between content attributes and lead generation
+   using scipy.stats.pearsonr.  Returns feature importance, p-values,
+   interpretation labels, and model R-squared.
+
+2. POST /content/decay-detection
+   Analyses traffic and lead trends for each content asset and classifies its
+   health status.  Outputs prioritised action recommendations.
 """
 
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
-from typing import List, Optional, Dict
+from typing import List, Optional, Literal
 import math
+import numpy as np
+from scipy import stats
 
 router = APIRouter()
 
 
-class ContentPerformanceData(BaseModel):
-    content_id:      str
-    title:           str
-    content_type:    str
-    word_count:      int = 0
-    seo_score:       float = 0
-    eeat_score:      float = 0
-    pageviews:       int = 0
-    leads_generated: int = 0
-    revenue_attr:    float = 0.0
-    published_days_ago: int = 0
-    internal_links:  int = 0
-    backlinks:       int = 0
+# ─────────────────────────────────────────────
+# Request / Response Models
+# ─────────────────────────────────────────────
+
+# ── Content Regression ────────────────────
+
+class ContentAsset(BaseModel):
+    """A single content asset with performance metrics for regression."""
+
+    id:               str
+    title:            str
+    content_type:     str
+    word_count:       int   = Field(0, ge=0)
+    has_video:        bool  = False
+    has_cta:          bool  = False
+    publish_month_age: int  = Field(0, ge=0, description="Months since publication")
+    internal_links:   int   = Field(0, ge=0)
+    backlinks:        int   = Field(0, ge=0)
+    leads_generated:  int   = Field(0, ge=0)
+    pageviews:        int   = Field(0, ge=0)
 
 
-class ClusterAnalysisRequest(BaseModel):
-    pillar_keyword:  str
-    cluster_pages:   List[ContentPerformanceData]
+class FeatureCorrelation(BaseModel):
+    feature:                 str
+    correlation_with_leads:  float
+    p_value:                 float
+    interpretation:          str
+
+
+class RegressionResponse(BaseModel):
+    feature_correlations:  List[FeatureCorrelation]
+    top_features:          List[str]
+    model_r_squared:       float
+    recommendations:       List[str]
+
+
+# ── Decay Detection ───────────────────────
+
+class DecayAsset(BaseModel):
+    """A content asset with before/after traffic and ranking data."""
+
+    id:                      str
+    title:                   str
+    published_at:            str
+    pageviews_last_30d:      int   = Field(0, ge=0)
+    pageviews_prior_30d:     int   = Field(0, ge=0)
+    leads_last_30d:          int   = Field(0, ge=0)
+    leads_prior_30d:         int   = Field(0, ge=0)
+    serp_position_current:   Optional[float] = None
+    serp_position_prior:     Optional[float] = None
+
+
+class DecayResult(BaseModel):
+    id:                  str
+    title:               str
+    decay_status:        Literal["healthy", "slight_decay", "significant_decay", "critical_decay"]
+    traffic_change_pct:  float
+    lead_change_pct:     float
+    serp_change:         Optional[float]
+    recommended_action:  str
+    priority_score:      float
 
 
 class DecayDetectionRequest(BaseModel):
-    weekly_pageviews: List[float]
-    weekly_leads:     List[float]
-    content_id:       str
+    content_assets: List[DecayAsset] = Field(..., min_length=1)
 
 
-@router.post("/regression")
-async def content_regression(pages: List[ContentPerformanceData]):
+class DecayDetectionResponse(BaseModel):
+    assets: List[DecayResult]
+
+
+# ─────────────────────────────────────────────
+# Endpoints
+# ─────────────────────────────────────────────
+
+@router.post("/regression", response_model=RegressionResponse)
+async def content_regression(content_assets: List[ContentAsset]):
     """
     Identify which content attributes correlate with lead generation.
-    Returns ranked feature importance.
+
+    Uses scipy.stats.pearsonr to compute the correlation coefficient and
+    two-tailed p-value for each feature against leads_generated.
+
+    Features analysed:
+      - word_count
+      - has_video        (binary 0/1)
+      - has_cta          (binary 0/1)
+      - publish_month_age
+      - internal_links
+      - backlinks
+      - pageviews        (traffic volume — baseline control)
+
+    Returns correlations sorted by absolute value (strongest first).
     """
-    if len(pages) < 5:
-        return {"error": "Need at least 5 pages for meaningful regression", "pages_provided": len(pages)}
+    if len(content_assets) < 5:
+        raise HTTPException(
+            400,
+            f"Need at least 5 content assets for meaningful regression. "
+            f"Received {len(content_assets)}.",
+        )
 
-    # Calculate correlations with lead generation
-    correlations = {}
-    leads = [p.leads_generated for p in pages]
-    leads_mean = sum(leads) / len(leads)
+    leads = np.array([a.leads_generated for a in content_assets], dtype=float)
 
-    features = {
-        "word_count":      [p.word_count for p in pages],
-        "seo_score":       [p.seo_score for p in pages],
-        "eeat_score":      [p.eeat_score for p in pages],
-        "internal_links":  [p.internal_links for p in pages],
-        "backlinks":       [p.backlinks for p in pages],
-        "content_age_days": [p.published_days_ago for p in pages],
+    features: dict = {
+        "word_count":        np.array([a.word_count        for a in content_assets], dtype=float),
+        "has_video":         np.array([float(a.has_video)  for a in content_assets], dtype=float),
+        "has_cta":           np.array([float(a.has_cta)    for a in content_assets], dtype=float),
+        "publish_month_age": np.array([a.publish_month_age for a in content_assets], dtype=float),
+        "internal_links":    np.array([a.internal_links    for a in content_assets], dtype=float),
+        "backlinks":         np.array([a.backlinks         for a in content_assets], dtype=float),
+        "pageviews":         np.array([a.pageviews         for a in content_assets], dtype=float),
     }
+
+    correlations: List[FeatureCorrelation] = []
 
     for feature_name, values in features.items():
-        corr = _pearson_correlation(values, leads)
-        correlations[feature_name] = round(corr, 3)
+        # Pearson requires variance in both arrays
+        if np.std(values) == 0 or np.std(leads) == 0:
+            r, p = 0.0, 1.0
+        else:
+            r, p = stats.pearsonr(values, leads)
+            r = float(r)
+            p = float(p)
 
-    # Sort by absolute correlation
-    sorted_corr = sorted(correlations.items(), key=lambda x: abs(x[1]), reverse=True)
+        interpretation = _interpret_correlation(feature_name, r, p)
+        correlations.append(
+            FeatureCorrelation(
+                feature=feature_name,
+                correlation_with_leads=round(r, 4),
+                p_value=round(p, 6),
+                interpretation=interpretation,
+            )
+        )
 
-    # Identify patterns
-    insights = _generate_content_insights(pages, correlations)
+    # Sort by absolute correlation descending
+    correlations.sort(key=lambda c: abs(c.correlation_with_leads), reverse=True)
 
-    return {
-        "pages_analyzed":    len(pages),
-        "feature_correlations": {k: v for k, v in sorted_corr},
-        "top_driver":        sorted_corr[0][0] if sorted_corr else None,
-        "insights":          insights,
-        "recommendations":   _content_recommendations(correlations, pages),
-    }
+    top_features = [c.feature for c in correlations if c.p_value < 0.05][:3]
+    if not top_features:
+        top_features = [c.feature for c in correlations[:3]]
+
+    # Approximate model R-squared using the top feature's r^2
+    model_r_squared = correlations[0].correlation_with_leads ** 2 if correlations else 0.0
+
+    recommendations = _build_regression_recommendations(correlations, content_assets)
+
+    return RegressionResponse(
+        feature_correlations=correlations,
+        top_features=top_features,
+        model_r_squared=round(model_r_squared, 4),
+        recommendations=recommendations,
+    )
 
 
-@router.post("/decay-detection")
-async def detect_content_decay(req: DecayDetectionRequest):
+@router.post("/decay-detection", response_model=DecayDetectionResponse)
+async def decay_detection(req: DecayDetectionRequest):
     """
-    Detect if content is decaying (losing traffic/leads over time).
-    Returns decay status and recommended action.
+    Classify each content asset's health and recommend the next action.
+
+    Decay classification rules (applied per asset):
+
+    traffic_change_pct = (last_30d - prior_30d) / max(prior_30d, 1) * 100
+
+    Status thresholds:
+      - healthy           : traffic_change >= -10% AND lead_change >= -10%
+      - slight_decay      : traffic_change in [-30%, -10%) OR lead_change in [-30%, -10%)
+      - significant_decay : traffic_change in [-50%, -30%) OR lead_change in [-50%, -30%)
+      - critical_decay    : traffic_change < -50%  OR lead_change < -50%
+
+    Priority score (0-100):
+        = 0.4 * |traffic_change| + 0.4 * |lead_change| + 0.2 * serp_drop_factor
+      Clamped to 100. Higher = more urgent.
     """
-    if len(req.weekly_pageviews) < 4:
-        return {"error": "Need at least 4 weeks of data"}
+    results: List[DecayResult] = []
 
-    pageviews = req.weekly_pageviews
-    leads     = req.weekly_leads
+    for asset in req.content_assets:
+        result = _analyze_asset_decay(asset)
+        results.append(result)
 
-    # Calculate trend slopes
-    pv_slope  = _linear_slope(list(range(len(pageviews))), pageviews)
-    lead_slope = _linear_slope(list(range(len(leads))), leads) if leads else 0
+    # Sort by priority descending so the most urgent items appear first
+    results.sort(key=lambda r: r.priority_score, reverse=True)
 
-    # Peak performance detection
-    peak_pv_week   = pageviews.index(max(pageviews))
-    current_pv     = pageviews[-1]
-    peak_pv        = max(pageviews)
-    decay_pct      = (peak_pv - current_pv) / peak_pv if peak_pv > 0 else 0
+    return DecayDetectionResponse(assets=results)
+
+
+# ─────────────────────────────────────────────
+# Decay analysis helpers
+# ─────────────────────────────────────────────
+
+def _analyze_asset_decay(asset: DecayAsset) -> DecayResult:
+    """Compute decay metrics and action recommendation for a single asset."""
+
+    # Traffic change %
+    prior_pv = max(asset.pageviews_prior_30d, 1)
+    traffic_change_pct = (asset.pageviews_last_30d - prior_pv) / prior_pv * 100.0
+
+    # Lead change %
+    prior_leads = max(asset.leads_prior_30d, 1)
+    lead_change_pct = (asset.leads_last_30d - prior_leads) / prior_leads * 100.0
+
+    # SERP change (positive = improved ranking, negative = dropped)
+    if (
+        asset.serp_position_current is not None
+        and asset.serp_position_prior is not None
+    ):
+        # Lower position number = better rank, so drop in rank = position increased
+        serp_change = asset.serp_position_prior - asset.serp_position_current
+    else:
+        serp_change = None
 
     # Classify decay status
-    if pv_slope > 0:
-        status = "growing"
-        action = "Scale — content is gaining momentum"
-    elif decay_pct < 0.15:
-        status = "stable"
-        action = "Maintain — content is holding position"
-    elif decay_pct < 0.40:
-        status = "declining"
-        action = "Refresh — update content, improve internal links, add new sections"
+    worst_change = min(traffic_change_pct, lead_change_pct)
+    if worst_change >= -10.0:
+        status: Literal["healthy", "slight_decay", "significant_decay", "critical_decay"] = "healthy"
+    elif worst_change >= -30.0:
+        status = "slight_decay"
+    elif worst_change >= -50.0:
+        status = "significant_decay"
     else:
-        status = "decaying"
-        action = "Major rewrite or kill — significant traffic/lead loss"
+        status = "critical_decay"
 
-    return {
-        "content_id":     req.content_id,
-        "status":         status,
-        "pageview_trend": f"{pv_slope:+.1f} views/week",
-        "lead_trend":     f"{lead_slope:+.2f} leads/week",
-        "decay_from_peak": f"{decay_pct * 100:.1f}%",
-        "peak_week":      peak_pv_week + 1,
-        "weeks_of_data":  len(pageviews),
-        "recommended_action": action,
-        "urgency": "high" if status == "decaying" else ("medium" if status == "declining" else "low"),
-    }
+    # Priority score
+    serp_drop_factor = 0.0
+    if serp_change is not None and serp_change < 0:
+        # Larger position drop = more urgent
+        serp_drop_factor = min(100.0, abs(serp_change) * 5.0)
+
+    priority_score = (
+        0.40 * min(100.0, abs(traffic_change_pct))
+        + 0.40 * min(100.0, abs(lead_change_pct))
+        + 0.20 * serp_drop_factor
+    )
+    priority_score = min(100.0, priority_score)
+
+    recommended_action = _recommend_action(
+        status=status,
+        serp_change=serp_change,
+        traffic_change_pct=traffic_change_pct,
+    )
+
+    return DecayResult(
+        id=asset.id,
+        title=asset.title,
+        decay_status=status,
+        traffic_change_pct=round(traffic_change_pct, 2),
+        lead_change_pct=round(lead_change_pct, 2),
+        serp_change=round(serp_change, 2) if serp_change is not None else None,
+        recommended_action=recommended_action,
+        priority_score=round(priority_score, 2),
+    )
 
 
-@router.post("/cluster-strength")
-async def analyze_cluster_strength(req: ClusterAnalysisRequest):
+def _recommend_action(
+    status: str,
+    serp_change: Optional[float],
+    traffic_change_pct: float,
+) -> str:
     """
-    Score the strength of a topic cluster.
-    A strong cluster = pillar page + multiple satellite pages all ranking and converting.
+    Map decay status + supporting signals to a specific recommended action.
+
+    Action taxonomy:
+      - monitor           : healthy, watch for changes
+      - refresh_content   : slight decay, update information and add new sections
+      - add_schema        : slight decay with SERP issues — structured data may help
+      - build_backlinks   : significant decay driven by link loss or SERP slip
+      - rewrite           : significant to critical decay with poor content quality signals
+      - redirect          : critical decay, page beyond recovery
     """
-    pages  = req.cluster_pages
-    n      = len(pages)
+    if status == "healthy":
+        return "monitor"
 
-    if n == 0:
-        return {"error": "No pages in cluster"}
+    if status == "slight_decay":
+        # If SERP dropped, schema markup can recover rankings
+        if serp_change is not None and serp_change < -3:
+            return "add_schema"
+        return "refresh_content"
 
-    total_leads   = sum(p.leads_generated for p in pages)
-    total_revenue = sum(p.revenue_attr for p in pages)
-    avg_seo       = sum(p.seo_score for p in pages) / n
-    total_links   = sum(p.internal_links for p in pages)
-    converting    = sum(1 for p in pages if p.leads_generated > 0)
+    if status == "significant_decay":
+        # If SERP has dropped heavily, backlink building is higher priority than a rewrite
+        if serp_change is not None and serp_change < -5:
+            return "build_backlinks"
+        return "rewrite"
 
-    # Cluster strength score (0-100)
-    depth_score    = min(30, n * 5)           # More pages = stronger
-    coverage_score = (converting / n) * 25    # % pages converting
-    revenue_score  = min(25, total_revenue / 100)  # Revenue generated
-    link_score     = min(20, total_links * 2)  # Internal link density
-
-    cluster_score  = depth_score + coverage_score + revenue_score + link_score
-
-    return {
-        "pillar_keyword":    req.pillar_keyword,
-        "cluster_size":      n,
-        "cluster_score":     round(min(100, cluster_score), 1),
-        "pages_converting":  converting,
-        "total_leads":       total_leads,
-        "total_revenue":     round(total_revenue, 2),
-        "avg_seo_score":     round(avg_seo, 1),
-        "total_internal_links": total_links,
-        "gaps": _identify_cluster_gaps(req.pillar_keyword, pages, n),
-        "next_pages_to_create": _suggest_cluster_expansion(req.pillar_keyword, pages),
-    }
-
-
-@router.get("/kill-candidates")
-async def get_kill_candidates(
-    min_pageviews: int = 200,
-    max_conversion_rate: float = 0.005,
-    min_age_days: int = 30,
-):
-    """
-    Return criteria for content that should be killed.
-    (Actual DB query happens in Node.js layer — this returns the filter logic.)
-    """
-    return {
-        "kill_criteria": {
-            "min_pageviews":         min_pageviews,
-            "max_conversion_rate":   max_conversion_rate,
-            "min_age_days":          min_age_days,
-            "description":           f"Pages with >{min_pageviews} views, <{max_conversion_rate*100:.1f}% CVR, older than {min_age_days} days",
-        },
-        "sql_query": f"""
-            SELECT id, title, pageviews, leads_generated,
-                   CAST(leads_generated AS FLOAT) / NULLIF(pageviews, 0) AS cvr
-            FROM content_assets
-            WHERE status = 'published'
-              AND pageviews > {min_pageviews}
-              AND CAST(leads_generated AS FLOAT) / NULLIF(pageviews, 0) < {max_conversion_rate}
-              AND published_at < NOW() - INTERVAL '{min_age_days} days'
-            ORDER BY pageviews DESC
-        """,
-    }
+    # critical_decay
+    if traffic_change_pct < -75:
+        return "redirect"
+    return "rewrite"
 
 
 # ─────────────────────────────────────────────
-# Helpers
+# Regression helpers
 # ─────────────────────────────────────────────
 
-def _pearson_correlation(x: List[float], y: List[float]) -> float:
-    n = len(x)
-    if n < 2:
-        return 0.0
-    x_mean = sum(x) / n
-    y_mean = sum(y) / n
-    num = sum((xi - x_mean) * (yi - y_mean) for xi, yi in zip(x, y))
-    den = math.sqrt(sum((xi - x_mean)**2 for xi in x) * sum((yi - y_mean)**2 for yi in y))
-    return num / den if den != 0 else 0.0
+def _interpret_correlation(feature: str, r: float, p: float) -> str:
+    """
+    Return a human-readable interpretation of a Pearson correlation.
+
+    Combines direction, magnitude label, and significance.
+    """
+    if p >= 0.10:
+        sig = "not statistically significant"
+    elif p >= 0.05:
+        sig = "marginally significant (p<0.10)"
+    else:
+        sig = "statistically significant (p<0.05)"
+
+    direction = "positive" if r >= 0 else "negative"
+
+    abs_r = abs(r)
+    if abs_r >= 0.7:
+        strength = "strong"
+    elif abs_r >= 0.4:
+        strength = "moderate"
+    elif abs_r >= 0.2:
+        strength = "weak"
+    else:
+        strength = "negligible"
+
+    return f"{strength.capitalize()} {direction} correlation ({r:+.3f}), {sig}."
 
 
-def _linear_slope(x: List[float], y: List[float]) -> float:
-    n = len(x)
-    if n < 2:
-        return 0.0
-    x_mean = sum(x) / n
-    y_mean = sum(y) / n
-    num = sum((xi - x_mean) * (yi - y_mean) for xi, yi in zip(x, y))
-    den = sum((xi - x_mean)**2 for xi in x)
-    return num / den if den != 0 else 0.0
+def _build_regression_recommendations(
+    correlations: List[FeatureCorrelation],
+    assets: List[ContentAsset],
+) -> List[str]:
+    """
+    Generate up to 5 actionable content recommendations based on the
+    correlation results.
+    """
+    recs: List[str] = []
 
+    # Top positive correlation driver
+    positives = [c for c in correlations if c.correlation_with_leads > 0.2 and c.p_value < 0.10]
+    if positives:
+        top = positives[0]
+        recs.append(
+            f"'{top.feature}' is the strongest lead driver (r={top.correlation_with_leads:+.3f}). "
+            "Prioritise optimising this attribute across all content."
+        )
 
-def _generate_content_insights(pages, correlations):
-    insights = []
-    if correlations.get("word_count", 0) > 0.3:
-        insights.append("Longer content correlates with more leads — prioritize depth over brevity")
-    if correlations.get("internal_links", 0) > 0.3:
-        insights.append("Internal links strongly predict lead gen — add more strategic internal links")
-    if correlations.get("seo_score", 0) > 0.3:
-        insights.append("SEO optimization directly impacts conversion — audit low-score pages")
-    if correlations.get("eeat_score", 0) > 0.4:
-        insights.append("EEAT signals are your strongest conversion driver — prioritize trust elements")
-    return insights
+    # Video signal
+    video_corr = next((c for c in correlations if c.feature == "has_video"), None)
+    if video_corr and video_corr.correlation_with_leads > 0.2:
+        no_video_count = sum(1 for a in assets if not a.has_video)
+        if no_video_count > 0:
+            recs.append(
+                f"Video content correlates positively with leads. "
+                f"{no_video_count} assets lack video — consider adding explainer videos."
+            )
 
+    # CTA signal
+    cta_corr = next((c for c in correlations if c.feature == "has_cta"), None)
+    if cta_corr and cta_corr.correlation_with_leads > 0.15:
+        no_cta_count = sum(1 for a in assets if not a.has_cta)
+        if no_cta_count > 0:
+            recs.append(
+                f"{no_cta_count} assets have no CTA. Adding lead-capture CTAs could "
+                "meaningfully increase conversion."
+            )
 
-def _content_recommendations(correlations, pages) -> List[str]:
-    recs = []
-    top_feature = max(correlations, key=lambda k: abs(correlations[k]))
-    recs.append(f"Optimize '{top_feature}' first — it has the strongest impact on leads")
+    # Traffic with zero leads
+    high_traffic_zero_leads = [
+        a for a in assets if a.pageviews >= 200 and a.leads_generated == 0
+    ]
+    if high_traffic_zero_leads:
+        recs.append(
+            f"{len(high_traffic_zero_leads)} assets have ≥200 pageviews but zero leads. "
+            "Audit for missing CTAs, weak offers, or mismatched intent."
+        )
 
-    low_converters = [p for p in pages if p.pageviews > 100 and p.leads_generated == 0]
-    if low_converters:
-        recs.append(f"{len(low_converters)} pages have traffic but zero leads — add CTAs and lead magnets")
+    # Backlink opportunity
+    backlink_corr = next((c for c in correlations if c.feature == "backlinks"), None)
+    if backlink_corr and backlink_corr.correlation_with_leads > 0.2:
+        low_backlink = [a for a in assets if a.backlinks < 3 and a.leads_generated > 2]
+        if low_backlink:
+            recs.append(
+                f"{len(low_backlink)} high-converting assets have fewer than 3 backlinks. "
+                "A focused link-building campaign could amplify their reach."
+            )
 
-    high_seo_low_leads = [p for p in pages if p.seo_score > 70 and p.leads_generated < 5]
-    if high_seo_low_leads:
-        recs.append(f"{len(high_seo_low_leads)} pages have good SEO but few leads — conversion problem, not traffic problem")
-
-    return recs
-
-
-def _identify_cluster_gaps(pillar: str, pages: List[ContentPerformanceData], n: int) -> List[str]:
-    gaps = []
-    if n < 5:
-        gaps.append(f"Cluster too thin — need at least 5 pages for topical authority (have {n})")
-    if not any(p.content_type == "comparison" for p in pages):
-        gaps.append("Missing comparison page — high-intent BOFU opportunity")
-    if not any(p.content_type == "case_study" for p in pages):
-        gaps.append("Missing case study — needed to convert researchers")
-    if not any("pricing" in p.title.lower() or "cost" in p.title.lower() for p in pages):
-        gaps.append("Missing pricing/cost page — strong BOFU intent keyword")
-    return gaps
-
-
-def _suggest_cluster_expansion(pillar: str, pages: List[ContentPerformanceData]) -> List[str]:
-    existing_types = {p.content_type for p in pages}
-    suggestions = []
-    if "comparison" not in existing_types:
-        suggestions.append(f"Best {pillar} alternatives [comparison page]")
-    if "case_study" not in existing_types:
-        suggestions.append(f"How [company] used {pillar} to achieve X [case study]")
-    suggestions.append(f"{pillar} pricing guide [BOFU landing page]")
-    suggestions.append(f"{pillar} for [specific industry] [use case page]")
-    suggestions.append(f"{pillar} vs [top competitor] [comparison page]")
-    return suggestions[:5]
+    return recs[:5]

@@ -7,7 +7,7 @@
  */
 
 import { callAI, parseJSON } from '../utils/ai.js';
-import { queryAll, queryOne, query } from '../utils/db.js';
+import { queryAll, queryOne, query, withTransaction } from '../utils/db.js';
 import { agentLogger } from '../utils/logger.js';
 import { config } from '../config.js';
 import { slackClient } from '../integrations/slack.js';
@@ -117,32 +117,40 @@ Return JSON:
 
     const scoring = parseJSON(content);
 
-    // Update lead record
-    await query(
-      `UPDATE leads SET
-         intent_score = $1,
-         fit_score = $2,
-         engagement_score = $3,
-         composite_score = $4,
-         stage = $5,
-         next_follow_up_at = NOW() + INTERVAL '5 minutes'
-       WHERE id = $6`,
-      [
-        scoring.intent_score,
-        scoring.fit_score,
-        scoring.engagement_score,
-        scoring.composite_score,
-        scoring.stage,
-        leadId,
-      ]
-    );
+    // Update lead record inside a transaction with a row-level lock to prevent
+    // race conditions when multiple processes score the same lead simultaneously.
+    await withTransaction(async (client) => {
+      // Lock the row for the duration of this transaction
+      await client.query(
+        `SELECT id FROM leads WHERE id = $1 FOR UPDATE`,
+        [leadId]
+      );
 
-    // Log pipeline event
-    await query(
-      `INSERT INTO pipeline_events (lead_id, event_type, channel, metadata)
-       VALUES ($1, 'lead_scored', $2, $3)`,
-      [leadId, 'organic_search', JSON.stringify(scoring)]
-    );
+      await client.query(
+        `UPDATE leads SET
+           intent_score = $1,
+           fit_score = $2,
+           engagement_score = $3,
+           composite_score = $4,
+           stage = $5,
+           next_follow_up_at = NOW() + INTERVAL '5 minutes'
+         WHERE id = $6`,
+        [
+          scoring.intent_score,
+          scoring.fit_score,
+          scoring.engagement_score,
+          scoring.composite_score,
+          scoring.stage,
+          leadId,
+        ]
+      );
+
+      await client.query(
+        `INSERT INTO pipeline_events (lead_id, event_type, channel, metadata)
+         VALUES ($1, 'lead_scored', $2, $3)`,
+        [leadId, 'organic_search', JSON.stringify(scoring)]
+      );
+    });
 
     // Multi-channel hot SQL alerts (score > 80) — all fire async, non-blocking
     if (scoring.composite_score > 80) {
@@ -200,11 +208,13 @@ Return JSON:
     if (!lead || lead.do_not_contact) return null;
     log.info('Generating follow-up', { runId, leadId, stage: lead.stage });
 
-    // Get the content they consumed
-    const consumedContent = lead.content_consumed?.length
+    // Get the content they consumed — guard against non-array values that would
+    // cause ANY($1) to throw a "malformed array literal" error.
+    const contentConsumed = Array.isArray(lead.content_consumed) ? lead.content_consumed : [];
+    const consumedContent = contentConsumed.length
       ? await queryAll(
           `SELECT title, content_type FROM content_assets WHERE id = ANY($1)`,
-          [lead.content_consumed]
+          [contentConsumed]
         )
       : [];
 

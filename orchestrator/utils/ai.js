@@ -91,8 +91,38 @@ async function _trackSpend(period, costUsd) {
   } catch { /* non-critical */ }
 }
 
+// ─────────────────────────────────────────────
+// Per-agent spend tracking (in-memory, reset on restart)
+// ─────────────────────────────────────────────
+const _agentMonthlySpend = new Map(); // agentName → { period, spentUsd }
+
+function _recordAgentSpend(agentName, period, costUsd) {
+  const existing = _agentMonthlySpend.get(agentName);
+  if (!existing || existing.period !== period) {
+    _agentMonthlySpend.set(agentName, { period, spentUsd: costUsd });
+  } else {
+    existing.spentUsd += costUsd;
+  }
+}
+
+function _checkAgentBudget(agentName, period, monthlyBudget) {
+  const entry = _agentMonthlySpend.get(agentName);
+  if (!entry || entry.period !== period) return;
+  const agentPct = entry.spentUsd / monthlyBudget;
+  if (agentPct >= 0.5) {
+    logger.warn('Agent has consumed >50% of monthly budget', {
+      agentName,
+      agentSpentUsd: entry.spentUsd.toFixed(4),
+      monthlyBudgetUsd: monthlyBudget,
+      pct: (agentPct * 100).toFixed(1),
+      period,
+    });
+  }
+}
+
 /**
- * Core AI call with automatic run tracking, cost estimation, and budget guardrails
+ * Core AI call with automatic run tracking, cost estimation, and budget guardrails.
+ * Retries up to 3 times with exponential backoff on rate-limit (429) and server errors (5xx).
  */
 export async function callAI({
   system,
@@ -116,80 +146,146 @@ export async function callAI({
         // Critical agents continue on cheapest fallback model
         model = FALLBACK_MODEL;
         logger.warn('AI budget exceeded — critical agent using fallback model', {
-          agentName, jobType, model, spentUsd: budget.spent_usd, budgetUsd: budget.budget_usd,
+          agentName, jobType, model,
         });
       } else {
         // Non-critical agents are blocked
         logger.warn('AI budget exceeded — non-critical agent blocked', {
-          agentName, jobType, spentUsd: budget.spent_usd, budgetUsd: budget.budget_usd,
+          agentName, jobType,
         });
         throw new Error(`AI budget exceeded for ${period}. Agent ${agentName} is non-critical and has been paused until next month.`);
       }
     }
   }
 
-  // ── AI call ───────────────────────────────────────
-  try {
-    const response = await client.chat.completions.create({
-      model,
-      max_tokens: maxTokens,
-      temperature,
-      messages: [
-        { role: 'system', content: system },
-        ...messages,
-      ],
-    });
+  // ── AI call with retry ────────────────────────────
+  const MAX_RETRIES = 3;
+  let lastErr;
 
-    const inputTokens  = response.usage?.prompt_tokens     || 0;
-    const outputTokens = response.usage?.completion_tokens || 0;
-    // GPT-4o-mini pricing: $0.15/MTok input, $0.60/MTok output
-    const costUsd = (inputTokens * 0.15 + outputTokens * 0.60) / 1_000_000;
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      const response = await client.chat.completions.create({
+        model,
+        max_tokens: maxTokens,
+        temperature,
+        messages: [
+          { role: 'system', content: system },
+          ...messages,
+        ],
+      });
 
-    logger.info('AI call complete', {
-      agent: agentName,
-      jobType,
-      model,
-      inputTokens,
-      outputTokens,
-      costUsd: costUsd.toFixed(6),
-      durationMs: Date.now() - start,
-    });
+      const inputTokens  = response.usage?.prompt_tokens     || 0;
+      const outputTokens = response.usage?.completion_tokens || 0;
+      // GPT-4o-mini pricing: $0.15/MTok input, $0.60/MTok output
+      const costUsd = (inputTokens * 0.15 + outputTokens * 0.60) / 1_000_000;
 
-    // ── Non-blocking spend tracking ───────────────────
-    if (budget && costUsd > 0) {
-      _trackSpend(period, costUsd).catch(() => {});
+      // Log metrics only — never log prompt or response content
+      logger.info('AI call complete', {
+        agent: agentName,
+        jobType,
+        model,
+        inputTokens,
+        outputTokens,
+        costUsd: costUsd.toFixed(6),
+        durationMs: Date.now() - start,
+        attempt,
+      });
+
+      // ── Non-blocking spend tracking ───────────────────
+      if (budget && costUsd > 0) {
+        _trackSpend(period, costUsd).catch(() => {});
+        _recordAgentSpend(agentName, period, costUsd);
+        _checkAgentBudget(agentName, period, parseFloat(budget.budget_usd));
+      }
+
+      return {
+        content:    response.choices[0]?.message?.content || '',
+        inputTokens,
+        outputTokens,
+        costUsd,
+        durationMs: Date.now() - start,
+      };
+    } catch (err) {
+      lastErr = err;
+
+      // Re-throw budget errors immediately — never retry
+      if (err.message?.includes('AI budget exceeded')) throw err;
+
+      const status = err.status || err.response?.status;
+      const isRetryable = status === 429 || status === 500 || status === 503;
+
+      if (isRetryable && attempt < MAX_RETRIES) {
+        const delayMs = Math.pow(2, attempt) * 1000;
+        logger.warn('AI call failed — retrying', {
+          agentName, jobType, attempt, status, delayMs, err: err.message,
+        });
+        await new Promise(resolve => setTimeout(resolve, delayMs));
+        continue;
+      }
+
+      logger.error('AI call failed', { agentName, jobType, status, err: err.message });
+      throw err;
     }
-
-    return {
-      content:    response.choices[0]?.message?.content || '',
-      inputTokens,
-      outputTokens,
-      costUsd,
-      durationMs: Date.now() - start,
-    };
-  } catch (err) {
-    // Re-throw budget errors without logging them as AI errors
-    if (err.message?.includes('AI budget exceeded')) throw err;
-    logger.error('AI call failed', { agentName, jobType, err: err.message });
-    throw err;
   }
+
+  // Should not reach here, but guard anyway
+  throw lastErr;
 }
 
 /**
- * Parse JSON from AI response reliably
+ * Parse JSON from AI response reliably.
+ * Handles: plain JSON, markdown code blocks, leading/trailing text garbage.
  */
 export function parseJSON(text) {
-  // Extract JSON block if wrapped in markdown
-  const match = text.match(/```(?:json)?\s*([\s\S]*?)```/);
-  const raw = match ? match[1] : text;
-  try {
-    return JSON.parse(raw.trim());
-  } catch {
-    // Try to extract first JSON object/array
-    const objMatch = raw.match(/(\{[\s\S]*\}|\[[\s\S]*\])/);
-    if (objMatch) return JSON.parse(objMatch[1]);
-    throw new Error(`Cannot parse JSON from: ${raw.substring(0, 200)}`);
+  if (!text || typeof text !== 'string') {
+    throw new Error('parseJSON: received empty or non-string input');
   }
+
+  // 1. Try extracting from a fenced code block first (```json ... ``` or ``` ... ```)
+  const fenceMatch = text.match(/```(?:json)?\s*([\s\S]*?)```/);
+  if (fenceMatch) {
+    const candidate = fenceMatch[1].trim();
+    try {
+      return JSON.parse(candidate);
+    } catch { /* fall through to next strategy */ }
+  }
+
+  // 2. Try parsing the whole trimmed text as-is
+  const trimmed = text.trim();
+  try {
+    return JSON.parse(trimmed);
+  } catch { /* fall through */ }
+
+  // 3. Find the outermost { } or [ ] block in the raw text
+  //    Walk character by character so we don't cut off nested structures.
+  for (const [open, close] of [['{', '}'], ['[', ']']]) {
+    const start = trimmed.indexOf(open);
+    if (start === -1) continue;
+
+    let depth = 0;
+    let inString = false;
+    let escape = false;
+
+    for (let i = start; i < trimmed.length; i++) {
+      const ch = trimmed[i];
+      if (escape) { escape = false; continue; }
+      if (ch === '\\' && inString) { escape = true; continue; }
+      if (ch === '"') { inString = !inString; continue; }
+      if (inString) continue;
+      if (ch === open)  depth++;
+      if (ch === close) {
+        depth--;
+        if (depth === 0) {
+          const slice = trimmed.slice(start, i + 1);
+          try {
+            return JSON.parse(slice);
+          } catch { break; }
+        }
+      }
+    }
+  }
+
+  throw new Error(`parseJSON: cannot extract valid JSON from response (first 200 chars): ${trimmed.substring(0, 200)}`);
 }
 
 /**

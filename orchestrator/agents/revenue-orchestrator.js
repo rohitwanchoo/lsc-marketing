@@ -48,16 +48,25 @@ export class RevenueOrchestratorAgent {
     log.info('Starting weekly strategic review', { runId });
 
     try {
-      // 1. Gather all performance data
+      // 1. Gather all performance data — use allSettled so one failing query
+      //    doesn't abort the entire review.
+      const settled = await Promise.allSettled([
+        this._getKPIs(),
+        this._getTopContent(10),
+        this._getTopKeywords(20),
+        this._getLeadPipeline(),
+        this._getRecentRevenue(30),
+        this._getExperiments(),
+      ]);
+
       const [kpis, topContent, topKeywords, leadPipeline, recentRevenue, experiments] =
-        await Promise.all([
-          this._getKPIs(),
-          this._getTopContent(10),
-          this._getTopKeywords(20),
-          this._getLeadPipeline(),
-          this._getRecentRevenue(30),
-          this._getExperiments(),
-        ]);
+        settled.map((r, i) => {
+          if (r.status === 'rejected') {
+            log.warn('weeklyStrategicReview: data fetch failed', { index: i, err: r.reason?.message });
+          }
+          // Default to null for scalars, empty array for collections
+          return r.status === 'fulfilled' ? r.value : (i === 0 ? null : []);
+        });
 
       // 2. Get current goals
       const currentGoals = await queryOne(
@@ -146,20 +155,22 @@ Analyze this data and return a JSON object with this exact structure:
    */
   async dailyDispatch() {
     const runId = uuidv4();
+    const start = Date.now();
     log.info('Starting daily dispatch', { runId });
 
-    const kpis = await this._getKPIs();
-    const currentGoals = await queryOne(
-      `SELECT * FROM growth_goals WHERE status = 'active' ORDER BY period_start DESC LIMIT 1`
-    );
+    try {
+      const kpis = await this._getKPIs();
+      const currentGoals = await queryOne(
+        `SELECT * FROM growth_goals WHERE status = 'active' ORDER BY period_start DESC LIMIT 1`
+      );
 
-    const { content } = await callAI({
-      agentName: this.name,
-      jobType: 'daily_dispatch',
-      system: SYSTEM_PROMPT,
-      messages: [{
-        role: 'user',
-        content: `Generate today's agent dispatch plan.
+      const { content, inputTokens, outputTokens, costUsd } = await callAI({
+        agentName: this.name,
+        jobType: 'daily_dispatch',
+        system: SYSTEM_PROMPT,
+        messages: [{
+          role: 'user',
+          content: `Generate today's agent dispatch plan.
 
 KPIs: ${JSON.stringify(kpis)}
 Weekly Goals: ${JSON.stringify(currentGoals)}
@@ -176,25 +187,32 @@ Return JSON:
     }
   ]
 }`,
-      }],
-      maxTokens: 2000,
-      temperature: 0.2,
-    });
+        }],
+        maxTokens: 2000,
+        temperature: 0.2,
+      });
 
-    const plan = parseJSON(content);
+      const plan = parseJSON(content);
 
-    // Dispatch jobs to BullMQ queues
-    for (const agentPlan of plan.dispatch || []) {
-      for (const job of agentPlan.jobs || []) {
-        await queues.dispatch(agentPlan.agent, job.type, job.payload, {
-          priority: job.priority,
-          jobId: `${agentPlan.agent}-${job.type}-${Date.now()}`,
-        });
-        log.info('Dispatched job', { agent: agentPlan.agent, jobType: job.type });
+      // Dispatch jobs to BullMQ queues
+      for (const agentPlan of plan.dispatch || []) {
+        for (const job of agentPlan.jobs || []) {
+          await queues.dispatch(agentPlan.agent, job.type, job.payload, {
+            priority: job.priority,
+            jobId: `${agentPlan.agent}-${job.type}-${Date.now()}`,
+          });
+          log.info('Dispatched job', { agent: agentPlan.agent, jobType: job.type });
+        }
       }
-    }
 
-    return plan;
+      await this._logRun(runId, 'daily_dispatch', 'success',
+        { kpis }, plan, inputTokens + outputTokens, costUsd, Date.now() - start);
+
+      return plan;
+    } catch (err) {
+      await this._logRun(runId, 'daily_dispatch', 'failed', {}, {}, 0, 0, Date.now() - start, err.message);
+      throw err;
+    }
   }
 
   async _executeDecisions(decisions) {

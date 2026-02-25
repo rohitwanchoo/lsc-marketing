@@ -197,26 +197,40 @@ Return JSON:
     weekStart.setDate(weekStart.getDate() - weekStart.getDay() + 1);
 
     for (const post of strategy.posts || []) {
-      const dayOffset = ['Monday','Tuesday','Wednesday','Thursday','Friday'].indexOf(post.day);
+      // Guard against AI returning null/undefined for required fields
+      const postDay  = post.day  || 'Monday';
+      const postType = post.type || 'insight';
+
+      const dayOffset = ['Monday','Tuesday','Wednesday','Thursday','Friday'].indexOf(postDay);
       const scheduledAt = new Date(weekStart);
-      scheduledAt.setDate(scheduledAt.getDate() + dayOffset);
+      scheduledAt.setDate(scheduledAt.getDate() + Math.max(0, dayOffset));
       scheduledAt.setHours(9, 0, 0, 0); // 9 AM
 
-      // Save as content asset
+      // Save as content asset — exclude product_id column when it is undefined/null
+      // to avoid inserting a NULL into a NOT NULL column.
       const assetId = uuidv4();
-      await query(
-        `INSERT INTO content_assets
-           (id, title, content_type, status, body_markdown, channel, generated_by, product_id)
-         VALUES ($1, $2, 'social_post', 'draft', $3, 'linkedin', 'authority_content', $4)`,
-        [assetId, `LinkedIn: ${post.type} — ${post.day}`, post.body, productId]
-      );
+      if (productId != null) {
+        await query(
+          `INSERT INTO content_assets
+             (id, title, content_type, status, body_markdown, channel, generated_by, product_id)
+           VALUES ($1, $2, 'social_post', 'draft', $3, 'linkedin', 'authority_content', $4)`,
+          [assetId, `LinkedIn: ${postType} — ${postDay}`, post.body, productId]
+        );
+      } else {
+        await query(
+          `INSERT INTO content_assets
+             (id, title, content_type, status, body_markdown, channel, generated_by)
+           VALUES ($1, $2, 'social_post', 'draft', $3, 'linkedin', 'authority_content')`,
+          [assetId, `LinkedIn: ${postType} — ${postDay}`, post.body]
+        );
+      }
 
       // Queue in social_posts table — body already contains CTA as final line
-      const fullBody = `${post.hook}\n\n${post.body}`;
+      const fullBody = `${post.hook || ''}\n\n${post.body || ''}`.trim();
       await query(
         `INSERT INTO social_posts (content_asset_id, platform, post_body, hashtags, scheduled_at)
          VALUES ($1, 'linkedin', $2, $3, $4)`,
-        [assetId, fullBody, post.hashtags, scheduledAt]
+        [assetId, fullBody, post.hashtags || [], scheduledAt]
       );
 
       // Mark the content asset as published now that it's queued for distribution
@@ -229,7 +243,7 @@ Return JSON:
       await eventBus.emit('content.published', {
         contentId:   assetId,
         contentType: 'social_post',
-        title:       `LinkedIn: ${post.type} — ${post.day}`,
+        title:       `LinkedIn: ${postType} — ${postDay}`,
         slug:        null,
       }).catch(() => {}); // non-blocking
     }

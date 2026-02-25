@@ -413,3 +413,253 @@ SELECT
   (SELECT COUNT(*) FROM keywords WHERE serp_position <= 10)        AS keywords_page1,
   (SELECT COUNT(*) FROM experiments WHERE status = 'running')      AS active_experiments,
   (SELECT COUNT(*) FROM agent_runs WHERE started_at >= NOW() - INTERVAL '24 hours') AS agent_runs_24h;
+
+-- ============================================================
+-- EXTENDED TABLES (idempotent — safe to run on existing schema)
+-- These match migration files 001-005.
+-- ============================================================
+
+-- ── Lead magnets (migration 001) ────────────────────────────
+CREATE TABLE IF NOT EXISTS lead_magnets (
+  id               UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  content_asset_id UUID REFERENCES content_assets(id) ON DELETE SET NULL,
+  title            TEXT NOT NULL,
+  description      TEXT,
+  file_url         TEXT NOT NULL,
+  type             TEXT NOT NULL
+                     CHECK (type IN ('checklist','template','audit','guide','report','video')),
+  download_count   INTEGER DEFAULT 0,
+  leads_captured   INTEGER DEFAULT 0,
+  is_active        BOOLEAN DEFAULT TRUE,
+  created_at       TIMESTAMP DEFAULT NOW(),
+  updated_at       TIMESTAMP DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_lead_magnets_asset ON lead_magnets(content_asset_id);
+CREATE INDEX IF NOT EXISTS idx_lead_magnets_active ON lead_magnets(is_active);
+
+CREATE TABLE IF NOT EXISTS lead_magnet_tokens (
+  id             UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  token          TEXT UNIQUE NOT NULL,
+  lead_magnet_id UUID NOT NULL REFERENCES lead_magnets(id) ON DELETE CASCADE,
+  lead_id        UUID REFERENCES leads(id),
+  email          TEXT,
+  full_name      TEXT,
+  company        TEXT,
+  source_page    TEXT,
+  expires_at     TIMESTAMP NOT NULL,
+  downloaded_at  TIMESTAMP,
+  created_at     TIMESTAMP DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_lmt_token       ON lead_magnet_tokens(token);
+CREATE INDEX IF NOT EXISTS idx_lmt_lead_magnet ON lead_magnet_tokens(lead_magnet_id);
+CREATE INDEX IF NOT EXISTS idx_lmt_lead        ON lead_magnet_tokens(lead_id);
+CREATE INDEX IF NOT EXISTS idx_lmt_expires     ON lead_magnet_tokens(expires_at);
+
+-- ── Scoring models (migration 002) ──────────────────────────
+CREATE TABLE IF NOT EXISTS scoring_models (
+  id            UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  period_start  DATE,
+  period_end    DATE,
+  weights       JSONB NOT NULL DEFAULT '{"job_title":25,"company_size":20,"page_intent":20,"engagement":20,"behavior":15}',
+  win_rate      NUMERIC(6,4),
+  sample_size   INTEGER,
+  won_sample    INTEGER,
+  lost_sample   INTEGER,
+  raw_response  JSONB DEFAULT '{}',
+  is_active     BOOLEAN DEFAULT FALSE,
+  created_at    TIMESTAMP DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_scoring_models_active ON scoring_models(is_active) WHERE is_active = TRUE;
+CREATE INDEX IF NOT EXISTS idx_scoring_models_period ON scoring_models(period_start DESC);
+
+-- ── AI budget (migration 003) ────────────────────────────────
+CREATE TABLE IF NOT EXISTS ai_budget (
+  id              UUID          PRIMARY KEY DEFAULT uuid_generate_v4(),
+  period          CHAR(7)       NOT NULL UNIQUE,
+  budget_usd      NUMERIC(10,2) NOT NULL DEFAULT 500.00,
+  spent_usd       NUMERIC(12,4) NOT NULL DEFAULT 0,
+  alert_80_sent   BOOLEAN       NOT NULL DEFAULT FALSE,
+  alert_100_sent  BOOLEAN       NOT NULL DEFAULT FALSE,
+  created_at      TIMESTAMPTZ   NOT NULL DEFAULT NOW(),
+  updated_at      TIMESTAMPTZ   NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_ai_budget_period ON ai_budget(period);
+
+-- ── Platform features (migration 004) ───────────────────────
+CREATE TABLE IF NOT EXISTS users (
+  id                    UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  email                 TEXT NOT NULL UNIQUE,
+  name                  TEXT,
+  role                  TEXT NOT NULL DEFAULT 'viewer'
+                          CHECK (role IN ('admin','manager','analyst','editor','viewer')),
+  password_hash         TEXT,
+  provider              TEXT DEFAULT 'credentials',
+  is_active             BOOLEAN DEFAULT TRUE,
+  last_login_at         TIMESTAMPTZ,
+  password_changed_at   TIMESTAMPTZ,
+  must_change_password  BOOLEAN DEFAULT TRUE,
+  created_at            TIMESTAMPTZ DEFAULT NOW(),
+  updated_at            TIMESTAMPTZ DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
+
+CREATE TABLE IF NOT EXISTS integrations_config (
+  id                UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  integration_name  TEXT UNIQUE NOT NULL,
+  api_key           TEXT,
+  config_json       JSONB DEFAULT '{}',
+  enabled           BOOLEAN DEFAULT FALSE,
+  webhook_url       TEXT,
+  webhook_secret    TEXT,
+  last_sync_at      TIMESTAMPTZ,
+  last_error        TEXT,
+  updated_at        TIMESTAMP DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS lead_timeline (
+  id          UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  lead_id     UUID NOT NULL REFERENCES leads(id) ON DELETE CASCADE,
+  event_type  TEXT NOT NULL CHECK (event_type IN
+                ('email_sent','page_visit','form_submit','stage_change','call','note','enriched')),
+  event_data  JSONB DEFAULT '{}',
+  source      TEXT,
+  created_at  TIMESTAMP DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_lead_timeline_lead ON lead_timeline(lead_id);
+CREATE INDEX IF NOT EXISTS idx_lead_timeline_time ON lead_timeline(created_at DESC);
+
+CREATE TABLE IF NOT EXISTS keyword_serp_history (
+  id            UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  keyword_id    UUID NOT NULL REFERENCES keywords(id) ON DELETE CASCADE,
+  position      NUMERIC(5,1),
+  search_volume INTEGER,
+  date          DATE NOT NULL DEFAULT CURRENT_DATE,
+  source        TEXT DEFAULT 'gsc',
+  created_at    TIMESTAMP DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_serp_history_keyword ON keyword_serp_history(keyword_id);
+CREATE INDEX IF NOT EXISTS idx_serp_history_date    ON keyword_serp_history(date DESC);
+
+CREATE TABLE IF NOT EXISTS agent_schedules (
+  id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  agent_name      agent_name NOT NULL,
+  job_type        TEXT NOT NULL,
+  cron_expression TEXT NOT NULL,
+  enabled         BOOLEAN DEFAULT TRUE,
+  max_daily_cost  NUMERIC(8,4),
+  run_count       INTEGER DEFAULT 0,
+  failure_count   INTEGER DEFAULT 0,
+  last_run_at     TIMESTAMPTZ,
+  next_run_at     TIMESTAMPTZ,
+  payload         JSONB DEFAULT '{}',
+  updated_at      TIMESTAMP DEFAULT NOW(),
+  UNIQUE(agent_name, job_type)
+);
+
+CREATE TABLE IF NOT EXISTS notifications (
+  id         UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  type       TEXT NOT NULL,
+  title      TEXT NOT NULL,
+  message    TEXT,
+  severity   TEXT NOT NULL DEFAULT 'info'
+               CHECK (severity IN ('info','warning','critical')),
+  is_read    BOOLEAN DEFAULT FALSE,
+  read_at    TIMESTAMP,
+  metadata   JSONB DEFAULT '{}',
+  created_at TIMESTAMP DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_notifications_unread   ON notifications(is_read, created_at DESC) WHERE is_read = FALSE;
+CREATE INDEX IF NOT EXISTS idx_notifications_created  ON notifications(created_at DESC);
+
+-- ── Products & foreign keys (migration 005) ──────────────────
+CREATE TABLE IF NOT EXISTS products (
+  id                  UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  name                TEXT NOT NULL,
+  slug                TEXT UNIQUE NOT NULL,
+  description         TEXT,
+  icp                 TEXT,
+  value_proposition   TEXT,
+  competitors         JSONB DEFAULT '[]',
+  pain_points_solved  TEXT[] DEFAULT '{}',
+  features            JSONB DEFAULT '[]',
+  website_url         TEXT,
+  status              TEXT NOT NULL DEFAULT 'active'
+                        CHECK (status IN ('active','inactive','archived')),
+  is_active           BOOLEAN DEFAULT TRUE,
+  created_at          TIMESTAMPTZ DEFAULT NOW(),
+  updated_at          TIMESTAMPTZ DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_products_slug   ON products(slug);
+CREATE INDEX IF NOT EXISTS idx_products_active ON products(status) WHERE status = 'active';
+
+-- emails_sent
+CREATE TABLE IF NOT EXISTS emails_sent (
+  id                  UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  lead_id             UUID REFERENCES leads(id) ON DELETE SET NULL,
+  email_address       TEXT NOT NULL,
+  subject             TEXT NOT NULL,
+  template_name       TEXT,
+  sendgrid_message_id TEXT,
+  status              TEXT DEFAULT 'sent'
+                        CHECK (status IN ('sent','delivered','opened','clicked','bounced','spam','unsubscribed')),
+  opens               INTEGER DEFAULT 0,
+  clicks              INTEGER DEFAULT 0,
+  sequence_step       INTEGER,
+  campaign_id         TEXT,
+  metadata            JSONB DEFAULT '{}',
+  sent_at             TIMESTAMPTZ DEFAULT NOW(),
+  delivered_at        TIMESTAMPTZ,
+  first_opened_at     TIMESTAMPTZ,
+  first_clicked_at    TIMESTAMPTZ,
+  bounced_at          TIMESTAMPTZ
+);
+CREATE INDEX IF NOT EXISTS idx_emails_sent_lead   ON emails_sent(lead_id);
+CREATE INDEX IF NOT EXISTS idx_emails_sent_status ON emails_sent(status);
+CREATE INDEX IF NOT EXISTS idx_emails_sent_date   ON emails_sent(sent_at DESC);
+CREATE INDEX IF NOT EXISTS idx_emails_sent_msgid  ON emails_sent(sendgrid_message_id);
+
+-- audit_logs
+CREATE TABLE IF NOT EXISTS audit_logs (
+  id            UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id       TEXT,
+  user_email    TEXT,
+  action        TEXT NOT NULL,
+  resource_type TEXT,
+  resource_id   TEXT,
+  changes       JSONB DEFAULT '{}',
+  ip_address    TEXT,
+  user_agent    TEXT,
+  created_at    TIMESTAMPTZ DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_audit_logs_user     ON audit_logs(user_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_audit_logs_resource ON audit_logs(resource_type, resource_id);
+CREATE INDEX IF NOT EXISTS idx_audit_logs_created  ON audit_logs(created_at DESC);
+
+-- lead_tags
+CREATE TABLE IF NOT EXISTS lead_tags (
+  lead_id  UUID NOT NULL REFERENCES leads(id) ON DELETE CASCADE,
+  tag      TEXT NOT NULL,
+  added_by TEXT DEFAULT 'system',
+  added_at TIMESTAMPTZ DEFAULT NOW(),
+  PRIMARY KEY (lead_id, tag)
+);
+CREATE INDEX IF NOT EXISTS idx_lead_tags_tag ON lead_tags(tag);
+
+-- website_analytics
+CREATE TABLE IF NOT EXISTS website_analytics (
+  id          UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  page_path   TEXT NOT NULL,
+  source      TEXT,
+  medium      TEXT,
+  campaign    TEXT,
+  keyword     TEXT,
+  sessions    INTEGER DEFAULT 0,
+  pageviews   INTEGER DEFAULT 0,
+  bounces     INTEGER DEFAULT 0,
+  conversions INTEGER DEFAULT 0,
+  period_date DATE NOT NULL,
+  created_at  TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(page_path, period_date, source, medium)
+);
+CREATE INDEX IF NOT EXISTS idx_website_analytics_date ON website_analytics(period_date DESC);
+CREATE INDEX IF NOT EXISTS idx_website_analytics_path ON website_analytics(page_path, period_date DESC);

@@ -2,14 +2,14 @@
 LSC Analytics API — Python FastAPI Service
 
 Handles computationally intensive analytics operations:
-- Statistical experiment analysis (proper frequentist stats)
+- Statistical experiment analysis (proper frequentist + Bayesian stats)
 - ML-based lead scoring enhancement
-- Attribution modeling
-- Revenue forecasting
-- Content performance regression analysis
+- Multi-touch attribution modeling
+- Revenue and lead forecasting
+- Content performance regression and decay analysis
 """
 
-from fastapi import FastAPI, HTTPException, BackgroundTasks
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
 import os
@@ -20,10 +20,9 @@ from routers import experiments, attribution, scoring, forecasting, content_inte
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Startup
+    """Manage application lifecycle."""
     print("LSC Analytics API starting...")
     yield
-    # Shutdown
     print("LSC Analytics API shutting down...")
 
 
@@ -52,20 +51,25 @@ app.include_router(content_intel.router, prefix="/content",       tags=["content
 
 @app.get("/health")
 async def health():
-    return {"status": "ok", "service": "lsc-analytics-api"}
+    """Health check endpoint."""
+    return {"status": "ok", "version": "1.0.0"}
 
 
 @app.get("/")
 async def root():
+    """API index listing all available endpoints."""
     return {
         "service": "LSC Analytics API",
+        "version": "1.0.0",
         "endpoints": [
             "/experiments/analyze",
-            "/attribution/u-shaped",
-            "/attribution/linear",
+            "/attribution/analyze",
             "/scoring/enhance",
             "/forecasting/mrr",
+            "/forecasting/leads",
+            "/forecasting/paid-unlock-timeline",
             "/content/regression",
+            "/content/decay-detection",
         ],
     }
 

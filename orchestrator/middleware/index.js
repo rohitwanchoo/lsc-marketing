@@ -4,7 +4,7 @@
  * Security, rate limiting, request logging, CORS, guardrails
  */
 
-import { createHmac } from 'crypto';
+import { createHmac, timingSafeEqual } from 'crypto';
 import { config } from '../config.js';
 import { logger } from '../utils/logger.js';
 
@@ -56,10 +56,20 @@ export function cors(req, res, next) {
 
 const requestCounts = new Map();
 
-export function rateLimiter({ windowMs = 60_000, max = 60, keyFn = null } = {}) {
+export function rateLimiter({ windowMs = 60_000, max = 60, keyFn = null, skipRateLimitIf = null } = {}) {
   return (req, res, next) => {
+    // Allow caller to exempt certain requests (e.g. health checks)
+    if (skipRateLimitIf && skipRateLimitIf(req)) return next();
+
     const key = keyFn ? keyFn(req) : req.ip;
     const now = Date.now();
+
+    // Bounded memory: if map grows beyond 10 000 entries, evict expired ones
+    if (requestCounts.size > 10_000) {
+      for (const [k, e] of requestCounts) {
+        if (now > e.resetAt) requestCounts.delete(k);
+      }
+    }
 
     if (!requestCounts.has(key)) {
       requestCounts.set(key, { count: 0, resetAt: now + windowMs });
@@ -87,13 +97,13 @@ export function rateLimiter({ windowMs = 60_000, max = 60, keyFn = null } = {}) 
   };
 }
 
-// Clean up rate limit map every 5 minutes
+// Clean up rate limit map every 1 minute
 setInterval(() => {
   const now = Date.now();
   for (const [key, entry] of requestCounts) {
     if (now > entry.resetAt) requestCounts.delete(key);
   }
-}, 300_000);
+}, 60_000);
 
 // ─────────────────────────────────────────────
 // Webhook signature validation (Stripe, SendGrid)
@@ -104,12 +114,33 @@ export function validateWebhookSignature({ secretEnvKey, headerName = 'x-webhook
     const secret    = process.env[secretEnvKey];
     const signature = req.headers[headerName];
 
-    if (!secret) return next(); // not configured → skip validation
+    // Secret not configured — reject rather than skip; misconfiguration is a security issue
+    if (!secret) {
+      logger.error('Webhook secret not configured for ' + secretEnvKey);
+      return res.status(401).json({ error: 'Webhook not configured' });
+    }
 
-    const payload = JSON.stringify(req.body);
-    const expected = createHmac('sha256', secret).update(payload).digest('hex');
+    if (!signature) {
+      logger.warn('Missing webhook signature header', { path: req.path, header: headerName });
+      return res.status(401).json({ error: 'Missing signature' });
+    }
 
-    if (signature !== `sha256=${expected}`) {
+    const payload  = JSON.stringify(req.body);
+    const expected = `sha256=${createHmac('sha256', secret).update(payload).digest('hex')}`;
+
+    // Use timing-safe comparison to prevent timing attacks
+    let signaturesMatch = false;
+    try {
+      signaturesMatch = timingSafeEqual(
+        Buffer.from(signature),
+        Buffer.from(expected)
+      );
+    } catch {
+      // Buffer lengths differ — signatures cannot match
+      signaturesMatch = false;
+    }
+
+    if (!signaturesMatch) {
       logger.warn('Invalid webhook signature', { path: req.path });
       return res.status(401).json({ error: 'Invalid signature' });
     }
@@ -148,8 +179,18 @@ export function requireTriggerApiKey(req, res, next) {
     return next();
   }
 
-  const provided = req.headers['x-api-key'] || req.query.api_key;
-  if (!provided || provided !== apiKey) {
+  // API key must be supplied via X-Api-Key header only; query params are not accepted
+  const provided = req.headers['x-api-key'];
+  let keyMatches = false;
+  if (provided) {
+    try {
+      keyMatches = timingSafeEqual(Buffer.from(provided), Buffer.from(apiKey));
+    } catch {
+      // Buffer lengths differ — keys cannot match
+      keyMatches = false;
+    }
+  }
+  if (!keyMatches) {
     logger.warn('Trigger API key rejected', { ip: req.ip, path: req.path });
     return res.status(401).json({ error: 'Invalid or missing API key. Set X-Api-Key header.' });
   }

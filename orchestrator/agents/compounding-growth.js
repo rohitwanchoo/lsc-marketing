@@ -130,14 +130,30 @@ Return JSON:
 
     const patterns = parseJSON(content);
 
-    // Save new playbooks to database
-    for (const pb of patterns.new_playbooks || []) {
+    // Save new playbooks to database — batch INSERT to avoid N+1 queries.
+    const newPlaybooks = (patterns.new_playbooks || []).filter(
+      pb => pb.name && pb.category
+    );
+    if (newPlaybooks.length > 0) {
+      // Build parameterised VALUES list: ($1,$2,$3,$4,$5,'compounding_growth'), ($6,$7,…)
+      const values = [];
+      const placeholders = newPlaybooks.map((pb, i) => {
+        const base = i * 5;
+        values.push(
+          pb.name,
+          pb.category,
+          pb.description || '',
+          JSON.stringify(pb.trigger_conditions || {}),
+          JSON.stringify(pb.action_steps || [])
+        );
+        return `($${base + 1}, $${base + 2}, $${base + 3}, $${base + 4}, $${base + 5}, 'compounding_growth')`;
+      });
+
       await query(
         `INSERT INTO playbooks (name, category, description, trigger_conditions, action_steps, created_by)
-         VALUES ($1, $2, $3, $4, $5, 'compounding_growth')
+         VALUES ${placeholders.join(', ')}
          ON CONFLICT DO NOTHING`,
-        [pb.name, pb.category, pb.description,
-         JSON.stringify(pb.trigger_conditions), JSON.stringify(pb.action_steps)]
+        values
       );
     }
 

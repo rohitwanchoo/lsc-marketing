@@ -17,7 +17,7 @@
 import { EventEmitter } from 'events';
 import { agentLogger } from '../utils/logger.js';
 import { queues } from '../queues/index.js';
-import { query } from '../utils/db.js';
+import { query, queryOne } from '../utils/db.js';
 import { hubspotClient } from '../integrations/hubspot.js';
 import { emailClient } from '../integrations/sendgrid.js';
 import { broadcast } from '../utils/sse-broadcaster.js';
@@ -70,9 +70,9 @@ class AgentEventBus extends EventEmitter {
       }
 
       // Sync to HubSpot regardless
-      const lead = await query(`SELECT * FROM leads WHERE id = $1`, [leadId]);
-      if (lead.rows[0]) {
-        await hubspotClient.upsertContact({ lead: lead.rows[0] });
+      const lead = await queryOne(`SELECT * FROM leads WHERE id = $1`, [leadId]);
+      if (lead) {
+        await hubspotClient.upsertContact({ lead });
       }
     });
 
@@ -84,9 +84,9 @@ class AgentEventBus extends EventEmitter {
 
       // Opportunity stage → create HubSpot deal
       if (newStage === 'opportunity') {
-        const lead = await query(`SELECT * FROM leads WHERE id = $1`, [leadId]);
-        if (lead.rows[0]) {
-          await hubspotClient.createDeal({ lead: lead.rows[0] });
+        const lead = await queryOne(`SELECT * FROM leads WHERE id = $1`, [leadId]);
+        if (lead) {
+          await hubspotClient.createDeal({ lead });
         }
       }
 

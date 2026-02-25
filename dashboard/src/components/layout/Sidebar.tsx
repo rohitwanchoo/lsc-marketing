@@ -2,28 +2,50 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { signOut } from 'next-auth/react';
-import { X } from 'lucide-react';
+import { X, type LucideIcon } from 'lucide-react';
 import {
   LayoutDashboard, Users, Search, TrendingUp, FlaskConical,
   BookOpen, DollarSign, Zap, Activity, Globe, ListTodo, LogOut, Radio, Settings,
+  Bell, Plug,
 } from 'lucide-react';
 import { NotificationCenter } from './NotificationCenter';
 import { GlobalSearch } from './GlobalSearch';
+import { useNotifications } from '@/hooks/useAPI';
 
-const NAV = [
-  { href: '/overview',     label: 'Overview',     icon: LayoutDashboard },
-  { href: '/products',     label: 'Products',     icon: Globe },
-  { href: '/leads',        label: 'Leads',        icon: Users },
-  { href: '/keywords',     label: 'Keywords',     icon: Search },
-  { href: '/content',      label: 'Content',      icon: BookOpen },
-  { href: '/experiments',  label: 'Experiments',  icon: FlaskConical },
-  { href: '/revenue',      label: 'Revenue',      icon: DollarSign },
-  { href: '/social',       label: 'Social',       icon: TrendingUp },
-  { href: '/agents',       label: 'Agents',       icon: Activity },
-  { href: '/playbooks',    label: 'Playbooks',    icon: Zap },
-  { href: '/jobs',         label: 'Job Queue',    icon: ListTodo },
-  { href: '/activity',     label: 'Live Activity', icon: Radio },
-  { href: '/settings',     label: 'Settings',     icon: Settings },
+function UnreadBadge() {
+  const { data } = useNotifications({ unread: true, limit: 50 });
+  const count = Array.isArray(data) ? data.length : 0;
+  if (count === 0) return null;
+  return (
+    <span className="ml-auto text-[9px] font-bold bg-red-500 text-white rounded-full px-1.5 py-0.5 min-w-[18px] text-center">
+      {count > 99 ? '99+' : count}
+    </span>
+  );
+}
+
+type NavItem = {
+  href:   string;
+  label:  string;
+  icon:   LucideIcon;
+  badge?: string;
+};
+
+const NAV: NavItem[] = [
+  { href: '/overview',              label: 'Overview',      icon: LayoutDashboard },
+  { href: '/products',              label: 'Products',      icon: Globe },
+  { href: '/leads',                 label: 'Leads',         icon: Users },
+  { href: '/keywords',              label: 'Keywords',      icon: Search },
+  { href: '/content',               label: 'Content',       icon: BookOpen },
+  { href: '/experiments',           label: 'Experiments',   icon: FlaskConical },
+  { href: '/revenue',               label: 'Revenue',       icon: DollarSign },
+  { href: '/social',                label: 'Social',        icon: TrendingUp },
+  { href: '/agents',                label: 'Agents',        icon: Activity },
+  { href: '/playbooks',             label: 'Playbooks',     icon: Zap },
+  { href: '/jobs',                  label: 'Job Queue',     icon: ListTodo },
+  { href: '/activity',              label: 'Live Activity', icon: Radio },
+  { href: '/notifications',         label: 'Notifications', icon: Bell, badge: 'unread' },
+  { href: '/settings',              label: 'Settings',      icon: Settings },
+  { href: '/settings/integrations', label: 'Integrations',  icon: Plug },
 ];
 
 interface SidebarProps {
@@ -64,8 +86,9 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
 
       {/* Nav */}
       <nav className="flex-1 px-2 py-4 space-y-0.5 overflow-y-auto">
-        {NAV.map(({ href, label, icon: Icon }) => {
+        {NAV.map(({ href, label, icon: Icon, badge }) => {
           const active = path === href || (href !== '/overview' && path.startsWith(href));
+          const hasBadge = badge === 'unread';
           return (
             <Link
               key={href}
@@ -79,6 +102,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
             >
               <Icon size={15} />
               {label}
+              {hasBadge && <UnreadBadge />}
             </Link>
           );
         })}
