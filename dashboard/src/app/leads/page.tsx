@@ -3,6 +3,7 @@ import { useState, useMemo } from 'react';
 import { useAPI } from '@/hooks/useAPI';
 import { Users, ArrowUpRight, Search, Filter, Download, ChevronLeft, ChevronRight, CheckSquare, Square, Tag, List } from 'lucide-react';
 import { LeadDrawer } from '@/components/leads/LeadDrawer';
+import { PageIntro, SmartEmptyState } from '@/components/guidance';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4001';
 const PAGE_SIZE = 25;
@@ -133,6 +134,15 @@ export default function LeadsPage() {
 
   return (
     <div className="p-6">
+      <PageIntro
+        page="leads"
+        icon={<Users size={16} className="text-green-400" />}
+        title="Leads — Your Pipeline in Real Time"
+        auto="Every new lead is scored 0-100 within 2 seconds. Hot leads (80+) trigger Slack/SMS alerts. All others enter automated email nurture"
+        yourJob="Focus on MQL and SQL stage leads — these are the ones most ready for a sales conversation"
+        outcome="After 30 days: a scored, staged pipeline you can hand directly to sales or let the system close automatically"
+      />
+
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div>
@@ -269,7 +279,7 @@ export default function LeadsPage() {
               <tr><td colSpan={8} className="text-center py-12 text-gray-600">Loading...</td></tr>
             )}
             {!loading && paginated.length === 0 && (
-              <tr><td colSpan={8} className="text-center py-12 text-gray-600">No leads match filters</td></tr>
+              <tr><td colSpan={8} className="text-center py-12"><SmartEmptyState page="leads" /></td></tr>
             )}
             {paginated.map((lead: any) => (
               <tr

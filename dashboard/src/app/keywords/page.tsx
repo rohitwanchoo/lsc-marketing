@@ -9,6 +9,7 @@ import {
   FileText, Link, Download, Layers,
 } from 'lucide-react';
 import { LineChart, Line, Tooltip, ResponsiveContainer } from 'recharts';
+import { PageIntro, SmartEmptyState } from '@/components/guidance';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4001';
 
@@ -348,6 +349,15 @@ export default function KeywordsPage() {
   return (
     <div className="flex flex-col h-screen overflow-hidden px-4 md:px-6 py-4 md:py-5 gap-3">
 
+      <PageIntro
+        page="keywords"
+        icon={<Search size={16} className="text-blue-400" />}
+        title="Keywords — Your Demand Capture Map"
+        auto="SEO Agent finds buying-intent keywords daily, tracks Google positions via Search Console, and attributes revenue to each keyword"
+        yourJob="Review the list, select the best BOFU keywords, click 'Generate Pages' to create landing pages for them"
+        outcome="After 60 days: 20-40 keywords on Google page 1, each generating leads without ad spend"
+      />
+
       {/* ── Header ───────────────────────────────────────────────────────── */}
       <div className="flex items-center justify-between shrink-0">
         <div>
@@ -602,18 +612,8 @@ export default function KeywordsPage() {
       )}
 
       {activeTab === 'list' && (productNames.length === 0 ? (
-        <div className="flex-1 bg-gray-900 border border-gray-800 rounded-xl flex flex-col items-center justify-center text-center gap-3">
-          <Search size={32} className="text-gray-700" />
-          <p className="text-gray-500 text-sm font-medium">No keywords discovered yet</p>
-          <p className="text-gray-600 text-xs">
-            Click <strong className="text-gray-400">Run Discovery</strong> to have the SEO agent research buying-intent keywords.
-          </p>
-          <button
-            onClick={() => setPanelOpen(true)}
-            className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 rounded-lg text-xs text-white transition-colors"
-          >
-            <Zap size={13} /> Run your first discovery
-          </button>
+        <div className="flex-1 bg-gray-900 border border-gray-800 rounded-xl flex flex-col items-center justify-center">
+          <SmartEmptyState page="keywords" onPrimaryAction={() => setPanelOpen(true)} />
         </div>
       ) : (
         <div className="flex-1 min-h-0 bg-gray-900 border border-gray-800 rounded-xl flex flex-col overflow-hidden">

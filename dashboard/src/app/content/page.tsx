@@ -6,6 +6,7 @@ import {
   Users, DollarSign, Eye, RefreshCw, X, Linkedin, Copy, Check, Trash2,
   Calendar, ChevronLeft, ChevronRight, Download, Share2, CheckCircle, XCircle,
 } from 'lucide-react';
+import { PageIntro, SmartEmptyState } from '@/components/guidance';
 
 interface ContentItem {
   id: string;
@@ -263,6 +264,15 @@ export default function ContentPage() {
 
   return (
     <div className="p-4 md:p-6 space-y-6">
+      <PageIntro
+        page="content"
+        icon={<BookOpen size={16} className="text-yellow-400" />}
+        title="Content — Your Lead Generation Assets"
+        auto="Authority Content Agent writes pages in your brand voice. Social Distribution repurposes each piece into LinkedIn posts automatically"
+        yourJob="Review drafts in the Approval tab, approve for publishing. Use the Calendar view to see what's scheduled"
+        outcome="After 30 days: a growing library of SEO assets each generating organic leads on autopilot"
+      />
+
       {viewing && <PostModal item={viewing} onClose={() => setViewing(null)} />}
 
       {/* Header */}
@@ -431,8 +441,8 @@ export default function ContentPage() {
                 )}
                 {!loading && list.length === 0 && (
                   <tr>
-                    <td colSpan={7} className="text-center py-10 text-gray-600 text-sm">
-                      No content yet — the Authority Content agent will generate pieces automatically.
+                    <td colSpan={7} className="text-center py-10">
+                      <SmartEmptyState page="content" />
                     </td>
                   </tr>
                 )}

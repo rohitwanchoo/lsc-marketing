@@ -2,6 +2,7 @@
 import { useState } from 'react';
 import { useAPI, triggerAgent } from '@/hooks/useAPI';
 import { Activity, Zap, CheckCircle, AlertCircle, RefreshCw, Clock, DollarSign, Calendar, Eye, X } from 'lucide-react';
+import { PageIntro } from '@/components/guidance';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4001';
 
@@ -237,6 +238,14 @@ export default function AgentsPage() {
 
   return (
     <div className="p-6">
+      <PageIntro
+        page="agents"
+        icon={<Activity size={16} className="text-blue-400" />}
+        title="Agents — Your Autonomous Marketing Team"
+        auto="All 7 agents run on cron schedules every day. Each logs every run with full details — cost, output, duration, tokens used"
+        yourJob="Normally just watch the activity. Use manual triggers only to test an agent or run it outside its normal schedule"
+        outcome="Agents compound over time — each week the system understands your business better and improves its decisions"
+      />
       <div className="mb-6">
         <h1 className="text-xl font-bold text-white flex items-center gap-2">
           <Activity size={20} className="text-green-400" /> Agent Control Panel

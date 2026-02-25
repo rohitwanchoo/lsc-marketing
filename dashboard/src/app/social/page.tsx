@@ -2,6 +2,7 @@
 import { useAPI, triggerAgent } from '@/hooks/useAPI';
 import { useState } from 'react';
 import { TrendingUp, Eye, Heart, MessageSquare, ExternalLink, RefreshCw, Trash2, Download } from 'lucide-react';
+import { PageIntro, SmartEmptyState } from '@/components/guidance';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4001';
 
@@ -80,6 +81,14 @@ export default function SocialPage() {
 
   return (
     <div className="p-6">
+      <PageIntro
+        page="social"
+        icon={<TrendingUp size={16} className="text-pink-400" />}
+        title="Social — Automated LinkedIn Distribution"
+        auto="Social Distribution Agent repurposes published content into platform-native posts, publishes on schedule, and flags buyer signals from engagement"
+        yourJob="Review scheduled posts before they go live. Check the engagement tab for leads who commented or liked"
+        outcome="After 30 days: consistent LinkedIn presence generating inbound attention without any manual posting"
+      />
       <div className="flex items-center justify-between mb-3">
         <div>
           <h1 className="text-xl font-bold text-white flex items-center gap-2">
@@ -177,10 +186,7 @@ export default function SocialPage() {
       <div className="space-y-3">
         {loading && <div className="text-center py-12 text-gray-600">Loading posts...</div>}
         {!loading && filtered.length === 0 && (
-          <div className="text-center py-12 text-gray-600">
-            <TrendingUp size={32} className="mx-auto mb-3 opacity-30" />
-            <p>No social posts yet. Generate a LinkedIn plan to get started.</p>
-          </div>
+          <SmartEmptyState page="social" />
         )}
         {filtered.map((post: any, i: number) => (
           <div key={i} className={`border rounded-xl p-4 ${PLATFORM_COLORS[post.platform] || 'bg-gray-900 border-gray-800'}`}>

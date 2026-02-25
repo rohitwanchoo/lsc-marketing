@@ -2,6 +2,7 @@
 import { useAPI, triggerAgent } from '@/hooks/useAPI';
 import { useState } from 'react';
 import { Zap, CheckCircle, Clock, ChevronDown, ChevronUp, Play } from 'lucide-react';
+import { PageIntro, SmartEmptyState } from '@/components/guidance';
 
 export default function PlaybooksPage() {
   const { data: playbooks, loading, refresh } = useAPI('/api/playbooks', { interval: 60_000 });
@@ -20,6 +21,14 @@ export default function PlaybooksPage() {
 
   return (
     <div className="p-6">
+      <PageIntro
+        page="playbooks"
+        icon={<Zap size={16} className="text-cyan-400" />}
+        title="Playbooks — Proven Growth Patterns"
+        auto="Compounding Growth Agent extracts reusable patterns from your top-performing content, keywords, emails, and posts every Thursday"
+        yourJob="Review AI-extracted playbooks. Each one shows trigger conditions and action steps that can be applied to 10x more angles"
+        outcome="After 90 days: a library of proven growth recipes that systematically scale your MRR"
+      />
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-xl font-bold text-white flex items-center gap-2">
@@ -142,10 +151,7 @@ export default function PlaybooksPage() {
           </div>
         ))}
         {!loading && (!playbooks || (playbooks as any[]).length === 0) && (
-          <div className="text-center py-12 text-gray-600">
-            <Zap size={32} className="mx-auto mb-3 opacity-30" />
-            <p>No playbooks yet. Run "Extract New Patterns" to discover growth patterns from your data.</p>
-          </div>
+          <SmartEmptyState page="playbooks" />
         )}
       </div>
     </div>

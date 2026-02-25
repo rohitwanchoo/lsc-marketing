@@ -6,6 +6,7 @@ import {
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
 } from 'recharts';
 import { DollarSign, TrendingUp, ArrowUpRight, ArrowDownRight, ShieldAlert } from 'lucide-react';
+import { PageIntro } from '@/components/guidance';
 
 const CHANNEL_COLORS: Record<string, string> = {
   organic_search: '#3b82f6',
@@ -69,6 +70,14 @@ export default function RevenuePage() {
 
   return (
     <div className="p-6">
+      <PageIntro
+        page="revenue"
+        icon={<DollarSign size={16} className="text-purple-400" />}
+        title="Revenue — What's Actually Making Money"
+        auto="Every sale is traced back to the exact keyword, page, and email that closed it using a U-shaped attribution model"
+        yourJob="Review the keyword and content attribution tables. Scale what has the highest revenue per lead"
+        outcome="After 60 days: clear ROI per keyword and content piece so you know exactly where to double down"
+      />
       <h1 className="text-xl font-bold text-white mb-1 flex items-center gap-2">
         <DollarSign size={20} className="text-purple-400" /> Revenue Attribution
       </h1>

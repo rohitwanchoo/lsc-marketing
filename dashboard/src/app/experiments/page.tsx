@@ -2,6 +2,7 @@
 import { useState } from 'react';
 import { useAPI, triggerAgent } from '@/hooks/useAPI';
 import { FlaskConical, AlertCircle, CheckCircle, Clock, Zap } from 'lucide-react';
+import { PageIntro, SmartEmptyState } from '@/components/guidance';
 
 export default function ExperimentsPage() {
   const { data: experiments, loading } = useAPI('/api/experiments', { interval: 15_000 });
@@ -32,6 +33,14 @@ export default function ExperimentsPage() {
 
   return (
     <div className="p-6">
+      <PageIntro
+        page="experiments"
+        icon={<FlaskConical size={16} className="text-yellow-400" />}
+        title="Experiments — Automatic A/B Testing"
+        auto="Inbound Conversion Agent creates and runs A/B tests on landing pages. Winner auto-declared at 90%+ statistical confidence"
+        yourJob="When a winner is found, click 'Scale Winner' to apply it across all similar pages. Otherwise just watch"
+        outcome="After 60 days: 20-40% conversion rate improvements from continuous automated experimentation"
+      />
       <h1 className="text-xl font-bold text-white mb-1 flex items-center gap-2">
         <FlaskConical size={20} className="text-yellow-400" /> Experiment Engine
       </h1>
@@ -63,10 +72,7 @@ export default function ExperimentsPage() {
       <div className="space-y-3">
         {loading && <div className="text-center py-12 text-gray-600">Loading experiments...</div>}
         {!loading && (!experiments || (experiments as any[]).length === 0) && (
-          <div className="text-center py-12 text-gray-600">
-            <FlaskConical size={32} className="mx-auto mb-3 opacity-30" />
-            <p>No experiments yet. They're created automatically as content is published.</p>
-          </div>
+          <SmartEmptyState page="experiments" />
         )}
         {Array.isArray(experiments) && (experiments as any[]).map((exp: any, i: number) => {
           const scaleState = scaling[exp.id];

@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useAPI, apiPost } from '@/hooks/useAPI';
+import { PageIntro } from '@/components/guidance';
 import {
   Globe, Plus, RefreshCw, Trash2, ChevronDown, ChevronUp,
   TrendingUp, Users, FileText, Search, DollarSign,
@@ -458,6 +459,14 @@ export default function ProductsPage() {
 
   return (
     <div className="p-6 max-w-4xl">
+      <PageIntro
+        page="products"
+        icon={<Globe size={16} className="text-blue-400" />}
+        title="Products — What You're Marketing"
+        auto="AI reads your website and automatically extracts your ICP, value proposition, competitors, pricing model, and brand tone"
+        yourJob="Paste your product URL and let the AI analyze it. Review and confirm the extracted profile looks accurate"
+        outcome="Once configured, every agent decision — keywords, emails, LinkedIn posts — is tailored to your exact buyer persona"
+      />
       <div className="mb-6">
         <h1 className="text-xl font-bold text-white flex items-center gap-2">
           <Globe size={20} className="text-blue-400" />

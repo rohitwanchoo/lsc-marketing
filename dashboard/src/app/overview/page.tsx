@@ -11,7 +11,8 @@ import {
   CheckCircle, Clock, RefreshCw,
 } from 'lucide-react';
 import { Tooltip as HelpTooltip } from '@/components/ui/Tooltip';
-import { OnboardingChecklist } from '@/components/layout/OnboardingChecklist';
+import { SmartActionBar, NarratedActivityFeed, PageIntro } from '@/components/guidance';
+import { LayoutDashboard } from 'lucide-react';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
@@ -157,7 +158,15 @@ export default function Dashboard() {
       </header>
 
       <div className="px-3 py-4 md:px-6 md:py-6">
-        <OnboardingChecklist />
+        <PageIntro
+          page="overview"
+          icon={<LayoutDashboard size={16} />}
+          title="Revenue Dashboard — Your Business at a Glance"
+          auto="All 7 agents run on schedule and update KPIs every 10-30 seconds automatically"
+          yourJob="Review trends weekly. Check the Agent Activity feed for anything needing attention"
+          outcome="After 30 days: a clear pattern of which keywords and content are generating leads"
+        />
+        <SmartActionBar />
         {/* KPI Grid */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
           <HelpTooltip content="Total new leads captured via organic channels in the last 30 days. Unlock goal: ≥50/month before paid ads are enabled." side="bottom">
@@ -280,25 +289,7 @@ export default function Dashboard() {
               </ResponsiveContainer>
             </div>
 
-            {/* Agent Activity Feed */}
-            <div className="bg-gray-900 border border-gray-800 rounded-xl p-5">
-              <h3 className="text-sm font-semibold text-gray-400 mb-4">Agent Activity (Live)</h3>
-              <div className="space-y-2 max-h-[220px] overflow-y-auto">
-                {Array.isArray(runs) && runs.slice(0, 12).map((run: any, i: number) => (
-                  <div key={i} className="flex items-center gap-3 py-1.5 border-b border-gray-800/50 last:border-0">
-                    <StatusIcon status={run.status} />
-                    <AgentBadge name={run.agent} />
-                    <span className="text-xs text-gray-400 flex-1 truncate">{run.job_type}</span>
-                    <span className="text-xs text-gray-600">
-                      {run.started_at ? new Date(run.started_at).toLocaleTimeString() : ''}
-                    </span>
-                  </div>
-                ))}
-                {(!runs || (runs as any[]).length === 0) && (
-                  <div className="text-gray-600 text-sm text-center py-8">No runs yet</div>
-                )}
-              </div>
-            </div>
+            <NarratedActivityFeed runs={runs as any[]} />
           </div>
         )}
 
